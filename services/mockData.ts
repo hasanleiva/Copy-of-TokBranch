@@ -1,110 +1,78 @@
-import { Video, BranchOption } from '../types';
-
-// Mock database
-const MOCK_VIDEOS: Video[] = [
-  {
-    id: 'v1',
-    url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    thumbnailUrl: 'https://picsum.photos/400/800?random=1',
-    title: 'Mountain Adventure',
-    description: 'Starting the journey at the base camp.',
-    likes: 1205,
-    views: 5400,
-    uploaderId: 'admin',
-    branchOptions: [
-      { id: 'b1', label: 'Climb Peak', thumbnailUrl: 'https://picsum.photos/100/100?random=2', targetVideoId: 'v2' },
-      { id: 'b2', label: 'Explore Cave', thumbnailUrl: 'https://picsum.photos/100/100?random=3', targetVideoId: 'v3' },
-      { id: 'b3', label: 'River Path', thumbnailUrl: 'https://picsum.photos/100/100?random=4', targetVideoId: 'v4' },
-    ]
-  },
-  {
-    id: 'v2',
-    url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
-    thumbnailUrl: 'https://picsum.photos/400/800?random=5',
-    title: ' The Peak',
-    description: 'The view from the top is amazing.',
-    likes: 340,
-    views: 1200,
-    uploaderId: 'admin',
-    branchOptions: [
-      { id: 'b4', label: 'Jump Off', thumbnailUrl: 'https://picsum.photos/100/100?random=6', targetVideoId: 'v1' }, // Loop back
-    ]
-  },
-  {
-    id: 'v3',
-    url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
-    thumbnailUrl: 'https://picsum.photos/400/800?random=7',
-    title: 'Deep Cave',
-    description: 'It is getting dark in here...',
-    likes: 560,
-    views: 2300,
-    uploaderId: 'admin',
-    branchOptions: []
-  },
-  {
-    id: 'v4',
-    url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-    thumbnailUrl: 'https://picsum.photos/400/800?random=8',
-    title: 'River Rapids',
-    description: 'Hold on tight!',
-    likes: 890,
-    views: 3100,
-    uploaderId: 'admin',
-    branchOptions: []
-  },
-  // A second "root" video for the feed
-  {
-    id: 'v5',
-    url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    thumbnailUrl: 'https://picsum.photos/400/800?random=9',
-    title: 'Cyber City',
-    description: 'Welcome to the future.',
-    likes: 9999,
-    views: 45000,
-    uploaderId: 'admin',
-    branchOptions: [
-       { id: 'b5', label: 'Enter Matrix', thumbnailUrl: 'https://picsum.photos/100/100?random=10', targetVideoId: 'v1' },
-    ]
-  }
-];
+import { VideoData, UserProfile } from '../types';
 
 export const VideoService = {
-  // Simulate fetching the main feed (root videos)
-  getFeed: async (): Promise<Video[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Return only videos that are meant to be feed starters (arbitrary logic for mock)
-        resolve(MOCK_VIDEOS.filter(v => ['v1', 'v5'].includes(v.id)));
-      }, 500);
+  fetchVideoData: async (path: string): Promise<VideoData> => {
+    try {
+      const response = await fetch(path);
+      if (!response.ok) {
+        throw new Error(`Failed to load video config at ${path}`);
+      }
+      const data: VideoData = await response.json();
+      return data;
+    } catch (error) {
+      console.error("VideoService Error:", error);
+      throw error;
+    }
+  },
+
+  getFeedPaths: async (): Promise<string[]> => {
+    return Promise.resolve(['/data/feed_1.json', '/data/feed_2.json']);
+  },
+
+  getUserProfile: async (username: string): Promise<UserProfile> => {
+    const targetUsername = username.replace('@', '');
+    
+    // Scan feed paths to find videos belonging to this user
+    const feedPaths = await VideoService.getFeedPaths();
+    const matchedVideos: VideoData[] = [];
+
+    for (const path of feedPaths) {
+      try {
+        const video = await VideoService.fetchVideoData(path);
+        // loose match to handle potential case differences or missing fields in mock data
+        if (video.uploaderId === targetUsername) {
+          // Ensure display fields exist
+          const videoForGrid = {
+            ...video,
+            // Use existing ID or fallback to path
+            id: video.id || path,
+            // Add a mock view count if missing from JSON
+            views: video.views || (Math.floor(Math.random() * 900) + 100 + 'K') 
+          };
+          matchedVideos.push(videoForGrid);
+        }
+      } catch (err) {
+        console.warn(`Could not load ${path} for profile scanning.`);
+      }
+    }
+
+    return Promise.resolve({
+      id: `user_${targetUsername}`,
+      username: targetUsername,
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${targetUsername}`,
+      followers: '1.9K',
+      likes: '46K',
+      bio: 'NEVER LOSE HOPE',
+      additionalInfo: 'Additional profile information',
+      videos: matchedVideos
     });
   },
 
-  getVideoById: async (id: string): Promise<Video | undefined> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(MOCK_VIDEOS.find(v => v.id === id));
-      }, 200);
-    });
+  searchChannels: async (query: string): Promise<Partial<UserProfile>[]> => {
+    const channels = [
+      { id: '1', username: 'narrative_explorer', followers: '1.9K' },
+      { id: '2', username: 'scifi_fan', followers: '12K' },
+      { id: '3', username: 'adventure_seeker', followers: '500' },
+      { id: '4', username: 'nature_lover', followers: '5.2K' },
+      { id: '5', username: 'tech_guru', followers: '1.1M' },
+    ];
+    return Promise.resolve(
+      channels.filter(c => c.username.toLowerCase().includes(query.toLowerCase()))
+    );
   },
 
-  // Mock upload - in real app, this would use Presigned URLs to R2
-  uploadVideo: async (video: Partial<Video>): Promise<Video> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newVideo: Video = {
-            id: `v${Date.now()}`,
-            url: video.url || '',
-            thumbnailUrl: video.thumbnailUrl || 'https://picsum.photos/400/800',
-            title: video.title || 'Untitled',
-            description: video.description || '',
-            likes: 0,
-            views: 0,
-            uploaderId: 'admin',
-            branchOptions: video.branchOptions || []
-        };
-        MOCK_VIDEOS.push(newVideo);
-        resolve(newVideo);
-      }, 1000);
-    });
+  uploadVideo: async (data: any): Promise<void> => {
+     console.log("Mock Upload:", data);
+     return Promise.resolve();
   }
 };

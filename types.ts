@@ -1,20 +1,24 @@
-export interface BranchOption {
-  id: string;
+export interface Branch {
+  appearAtSecond: number;
+  PauseAtappersecond: boolean;
+  DurationPauseseconds?: number;
   label: string;
-  thumbnailUrl: string;
-  targetVideoId: string; // The video this option leads to
+  labelpositionx: number; // Percentage 0-100
+  labelpositiony: number; // Percentage 0-100
+  targetVideoUrl: string;
+  targetJson: string; // Path to the next JSON file
 }
 
-export interface Video {
-  id: string;
-  url: string; // URL to the mp4/m3u8
-  thumbnailUrl: string;
-  title: string;
-  description: string;
-  likes: number;
-  views: number;
-  uploaderId: string;
-  branchOptions: BranchOption[];
+export interface VideoData {
+  mainVideoUrl: string;
+  branches: Branch[];
+  id?: string;
+  title?: string;
+  description?: string;
+  likes?: number;
+  uploaderId?: string;
+  thumbnailUrl?: string;
+  views?: string; // e.g. "2.1M"
 }
 
 export interface User {
@@ -23,10 +27,13 @@ export interface User {
   isAdmin: boolean;
 }
 
-export interface VideoUploadPayload {
-  title: string;
-  description: string;
-  videoFile: File | null;
-  thumbnailFile: File | null;
-  branchOptions: BranchOption[];
+export interface UserProfile {
+  id: string;
+  username: string;
+  avatarUrl: string;
+  followers: string;
+  likes: string;
+  bio: string;
+  additionalInfo: string;
+  videos: VideoData[];
 }

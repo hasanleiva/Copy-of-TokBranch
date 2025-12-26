@@ -1,0 +1,29 @@
+{
+  "id": "forest_entry",
+  "title": "Into the Woods",
+  "description": "The trees are dense and the air is cold. You hear a rustling sound in the bushes.",
+  "likes": 85,
+  "uploaderId": "narrative_explorer",
+  "thumbnailUrl": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&q=80&w=800",
+  "mainVideoUrl": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
+  "branches": [
+    {
+      "appearAtSecond": 5,
+      "PauseAtappersecond": true,
+      "label": "🔍 Investigate Sound",
+      "labelpositionx": 50,
+      "labelpositiony": 30,
+      "targetVideoUrl": "https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+      "targetJson": "/data/forest_secret.json"
+    },
+    {
+      "appearAtSecond": 8,
+      "PauseAtappersecond": true,
+      "label": "🏃 Run Back",
+      "labelpositionx": 50,
+      "labelpositiony": 70,
+      "targetVideoUrl": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+      "targetJson": "/data/feed_1.json"
+    }
+  ]
+}
