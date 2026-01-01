@@ -1,90 +1,292 @@
 import React, { useState } from 'react';
 import { useAuth } from '../services/authContext';
 import { useNavigate } from 'react-router';
+import { Eye, EyeOff, Mail, Lock, ArrowLeft, CheckCircle } from 'lucide-react';
 
 export const Login: React.FC = () => {
-  const { login } = useAuth();
+  const { loginWithEmail, signupWithEmail, resetPassword } = useAuth();
   const navigate = useNavigate();
+  
+  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleGoogleLogin = async () => {
+  // Form State
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
+
     try {
-      await login();
+      if (isLoginMode) {
+        await loginWithEmail(email, password);
+      } else {
+        await signupWithEmail(email, password);
+      }
       // Auth state change in context will handle the user update
-      // We just navigate on success
       navigate('/profile');
     } catch (err: any) {
       console.error(err);
-      // Display friendly error message
-      if (err.code === 'auth/popup-closed-by-user') {
-        setError('Sign-in cancelled.');
-      } else if (err.code === 'auth/configuration-not-found') {
-        setError('Firebase config missing. Check services/firebaseConfig.ts');
-      } else {
-        setError('Failed to sign in. Please try again.');
-      }
+      handleAuthErrors(err);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setError("Please enter your email address.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await resetPassword(email);
+      setResetSent(true);
+    } catch (err: any) {
+      console.error(err);
+      handleAuthErrors(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAuthErrors = (err: any) => {
+      // Map Firebase errors to user friendly messages
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('Invalid email or password.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('This email is already in use.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('Password should be at least 6 characters.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else {
+        setError(err.message || 'Action failed. Please try again.');
+      }
+  };
+
+  const resetForm = () => {
+      setError(null);
+      setIsResetMode(false);
+      setResetSent(false);
+      setIsLoginMode(true);
+  };
+
+  // --- Reset Password View ---
+  if (isResetMode) {
+    return (
+      <div className="w-full h-full flex flex-col bg-white px-8 text-black overflow-y-auto">
+        <div className="flex-1 flex flex-col justify-center w-full max-w-sm mx-auto py-10">
+          <div className="flex flex-col items-center mb-8">
+            <button 
+              onClick={resetForm}
+              className="absolute top-6 left-6 p-2 bg-gray-50 rounded-full hover:bg-gray-100"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            
+            <div className="bg-blue-50 p-3 rounded-2xl mb-6">
+              <Lock size={32} className="text-blue-500" />
+            </div>
+            
+            <h1 className="text-2xl font-black text-center mb-2 tracking-tight">
+              {resetSent ? 'Check your email' : 'Reset Password'}
+            </h1>
+            <p className="text-center text-gray-400 text-sm px-4">
+              {resetSent 
+                ? `We've sent password reset instructions to ${email}`
+                : 'Enter your email address and we will send you a link to reset your password.'
+              }
+            </p>
+          </div>
+
+          {resetSent ? (
+            <div className="space-y-4">
+               <div className="flex justify-center mb-4">
+                 <CheckCircle size={48} className="text-green-500" />
+               </div>
+               <button 
+                onClick={resetForm}
+                className="w-full bg-gray-900 hover:bg-black text-white font-bold py-3.5 rounded-xl transition-all"
+               >
+                 Back to Log In
+               </button>
+            </div>
+          ) : (
+            <form onSubmit={handleResetSubmit} className="space-y-4">
+               {error && (
+                <div className="bg-red-50 text-red-500 text-xs p-3 rounded-lg text-center border border-red-100 break-words">
+                  {error}
+                </div>
+              )}
+              
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <Mail size={18} />
+                </div>
+                <input 
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email address"
+                  className="w-full bg-gray-50 border border-gray-200 text-black text-sm rounded-xl py-3.5 pl-10 pr-4 focus:outline-none focus:border-pink-500 focus:bg-white transition-colors"
+                  required
+                />
+              </div>
+
+              <button 
+                type="submit"
+                disabled={loading}
+                className="w-full bg-[#fe2c55] hover:bg-[#e6264c] text-white font-bold py-3.5 rounded-xl transition-all shadow-md shadow-pink-500/20 active:scale-[0.98] flex items-center justify-center mt-2"
+              >
+                 {loading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                 ) : (
+                    'Send Reset Link'
+                 )}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- Login / Signup View ---
   return (
     <div className="w-full h-full flex flex-col bg-white px-8 text-black overflow-y-auto">
       <div className="flex-1 flex flex-col justify-center w-full max-w-sm mx-auto py-10">
         
         {/* Logo & Title */}
-        <div className="flex flex-col items-center mb-10">
+        <div className="flex flex-col items-center mb-8">
            <div className="bg-[#fe2c55] p-3 rounded-2xl rotate-3 shadow-lg mb-6">
               <h1 className="text-3xl font-black text-white italic">
                 TB
               </h1>
            </div>
            <h1 className="text-2xl font-black text-center mb-2 tracking-tight">
-             Log in to TokBranch
+             {isLoginMode ? 'Welcome back' : 'Create account'}
            </h1>
            <p className="text-center text-gray-400 text-sm">
-             Manage your account, check notifications, comment on videos, and more.
+             {isLoginMode 
+               ? 'Log in to continue your TokBranch journey.' 
+               : 'Join TokBranch to start your interactive story.'}
            </p>
         </div>
 
-        <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           
           {error && (
-            <div className="bg-red-50 text-red-500 text-xs p-3 rounded-lg text-center border border-red-100">
+            <div className="bg-red-50 text-red-500 text-xs p-3 rounded-lg text-center border border-red-100 break-words">
               {error}
             </div>
           )}
 
-          {/* Google Sign In */}
+          {/* Email Input */}
+          <div className="relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <Mail size={18} />
+            </div>
+            <input 
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email address"
+              className="w-full bg-gray-50 border border-gray-200 text-black text-sm rounded-xl py-3.5 pl-10 pr-4 focus:outline-none focus:border-pink-500 focus:bg-white transition-colors"
+              required
+            />
+          </div>
+
+          {/* Password Input */}
+          <div className="relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <Lock size={18} />
+            </div>
+            <input 
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              className="w-full bg-gray-50 border border-gray-200 text-black text-sm rounded-xl py-3.5 pl-10 pr-10 focus:outline-none focus:border-pink-500 focus:bg-white transition-colors"
+              required
+            />
+            <button 
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+
+          {/* Forgot Password Link (Login Mode Only) */}
+          {isLoginMode && (
+            <div className="flex justify-end">
+              <button 
+                type="button"
+                onClick={() => {
+                   setError(null);
+                   setIsResetMode(true);
+                }}
+                className="text-xs font-semibold text-gray-500 hover:text-black"
+              >
+                Forgot Password?
+              </button>
+            </div>
+          )}
+
+          {/* Submit Button */}
           <button 
-            type="button"
-            onClick={handleGoogleLogin}
+            type="submit"
             disabled={loading}
-            className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-black font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-3 relative shadow-sm active:scale-[0.98]"
+            className="w-full bg-[#fe2c55] hover:bg-[#e6264c] text-white font-bold py-3.5 rounded-xl transition-all shadow-md shadow-pink-500/20 active:scale-[0.98] flex items-center justify-center mt-2"
           >
              {loading ? (
-                <div className="w-5 h-5 border-2 border-gray-200 border-t-pink-500 rounded-full animate-spin"></div>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
              ) : (
-                <>
-                 <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                 </svg>
-                 <span>Continue with Google</span>
-                </>
+                isLoginMode ? 'Log In' : 'Sign Up'
              )}
           </button>
+        </form>
+
+        {/* Toggle Mode */}
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-500">
+            {isLoginMode ? "Don't have an account? " : "Already have an account? "}
+            <button 
+              type="button"
+              onClick={() => {
+                setIsLoginMode(!isLoginMode);
+                setError(null);
+                // We keep email if they typed it, but clear password
+                setPassword('');
+              }}
+              className="text-[#fe2c55] font-bold hover:underline"
+            >
+              {isLoginMode ? 'Sign up' : 'Log in'}
+            </button>
+          </p>
         </div>
+
       </div>
       
       {/* Footer */}
       <div className="py-6 border-t border-gray-100 text-center">
-        <p className="text-xs text-gray-400">
+        <p className="text-[10px] text-gray-400">
           By continuing, you agree to our Terms of Service and Privacy Policy.
         </p>
       </div>

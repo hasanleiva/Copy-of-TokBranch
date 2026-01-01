@@ -12,8 +12,8 @@
       "PauseAtappersecond": true,
       "DurationPauseseconds": 5,
       "label": "Vini View",
-      "labelpositionx": 25,
-      "labelpositiony": 50,
+      "labelpositionx": 5,
+      "labelpositiony": 70,
       "targetVideoUrl": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
       "targetJson": "/data/forest_entry.json"
     },

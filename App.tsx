@@ -2,6 +2,9 @@ import React from 'react';
 // Changed import from 'react-router-dom' to 'react-router' to fix missing export errors
 import { HashRouter, Routes, Route, Navigate, useLocation, Link } from 'react-router';
 import { Feed } from './pages/Feed';
+import { Home } from './pages/Home';
+import { SectionVideos } from './pages/SectionVideos';
+import { Library } from './pages/Library';
 import { Admin } from './pages/Admin';
 import { Login } from './pages/Login';
 import { Channel } from './pages/Channel';
@@ -10,7 +13,7 @@ import { Profile } from './pages/Profile';
 import { MyAccount } from './pages/MyAccount';
 import { Subscriptions } from './pages/Subscriptions';
 import { AuthProvider, useAuth } from './services/authContext';
-import { Home, Search, User, Upload } from 'lucide-react';
+import { Home as HomeIcon, Compass, User, Upload, FolderHeart } from 'lucide-react';
 
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
   const { user } = useAuth();
@@ -25,13 +28,13 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
   const { user } = useAuth();
   
   const isHome = location.pathname === '/';
-  const isDiscover = location.pathname === '/discover';
+  const isExplore = location.pathname === '/explore';
+  const isLibrary = location.pathname === '/library';
   const isMe = location.pathname.startsWith('/profile');
 
   // Hide bottom nav on specific sub-pages to give more screen real estate, or keep it. 
   // Based on standard UX, we usually keep it unless it's a deep setting page. 
-  // For this request, we keep it simple.
-
+  
   return (
     <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-white relative shadow-2xl overflow-hidden text-black">
       {/* Main Content Area */}
@@ -41,26 +44,31 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 
       {/* Bottom Navigation - Always Light Mode */}
       <nav className="absolute bottom-0 left-0 w-full h-16 flex justify-around items-center z-50 pb-2 bg-white border-t border-gray-100 text-black">
-        <Link to="/" className={`flex flex-col items-center p-2 transition-opacity ${isHome ? 'opacity-100 text-black' : 'opacity-40 hover:opacity-100'}`}>
-          <Home size={24} strokeWidth={isHome ? 2.5 : 2} />
+        <Link to="/" className={`flex flex-col items-center p-2 transition-opacity ${isHome ? 'opacity-100 text-[#fe2c55]' : 'opacity-40 hover:opacity-100'}`}>
+          <HomeIcon size={24} strokeWidth={isHome ? 2.5 : 2} />
           <span className="text-[10px] font-bold mt-0.5">Home</span>
         </Link>
 
-        <Link to="/discover" className={`flex flex-col items-center p-2 transition-opacity ${isDiscover ? 'opacity-100 text-black' : 'opacity-40 hover:opacity-100'}`}>
-          <Search size={24} strokeWidth={isDiscover ? 2.5 : 2} />
-          <span className="text-[10px] font-bold mt-0.5">Discover</span>
+        <Link to="/explore" className={`flex flex-col items-center p-2 transition-opacity ${isExplore ? 'opacity-100 text-[#fe2c55]' : 'opacity-40 hover:opacity-100'}`}>
+          <Compass size={24} strokeWidth={isExplore ? 2.5 : 2} />
+          <span className="text-[10px] font-bold mt-0.5">Explore</span>
+        </Link>
+
+        <Link to="/library" className={`flex flex-col items-center p-2 transition-opacity ${isLibrary ? 'opacity-100 text-[#fe2c55]' : 'opacity-40 hover:opacity-100'}`}>
+          <FolderHeart size={24} strokeWidth={isLibrary ? 2.5 : 2} />
+          <span className="text-[10px] font-bold mt-0.5">My Library</span>
         </Link>
         
         {user?.isAdmin && (
-           <Link to="/admin" className={`flex flex-col items-center p-2 transition-opacity ${location.pathname === '/admin' ? 'opacity-100 text-black' : 'opacity-40 hover:opacity-100'}`}>
+           <Link to="/admin" className={`flex flex-col items-center p-2 transition-opacity ${location.pathname === '/admin' ? 'opacity-100 text-[#fe2c55]' : 'opacity-40 hover:opacity-100'}`}>
             <Upload size={24} strokeWidth={location.pathname === '/admin' ? 2.5 : 2} />
             <span className="text-[10px] font-bold mt-0.5">Upload</span>
           </Link>
         )}
 
-        <Link to={user ? "/profile" : "/login"} className={`flex flex-col items-center p-2 transition-opacity ${isMe ? 'opacity-100 text-black' : 'opacity-40 hover:opacity-100'}`}>
+        <Link to={user ? "/profile" : "/login"} className={`flex flex-col items-center p-2 transition-opacity ${isMe ? 'opacity-100 text-[#fe2c55]' : 'opacity-40 hover:opacity-100'}`}>
           <User size={24} strokeWidth={isMe ? 2.5 : 2} />
-          <span className="text-[10px] font-bold mt-0.5">Me</span>
+          <span className="text-[10px] font-bold mt-0.5">Profile</span>
         </Link>
       </nav>
     </div>
@@ -73,8 +81,10 @@ export default function App() {
       <HashRouter>
         <Layout>
           <Routes>
-            <Route path="/" element={<Feed />} />
-            <Route path="/discover" element={<Discover />} />
+            <Route path="/" element={<Home />} />
+            <Route path="/explore" element={<Feed />} />
+            <Route path="/library" element={<Library />} />
+            <Route path="/section/:type" element={<SectionVideos />} />
             <Route path="/login" element={<Login />} />
             <Route path="/channel/:userId" element={<Channel />} />
             

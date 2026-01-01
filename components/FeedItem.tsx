@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router';
 import { VideoPlayer } from './VideoPlayer';
 import { VideoData, Branch } from '../types';
 import { VideoService } from '../services/mockData';
-import { Heart, MessageCircle, Share2, GitBranch, Loader2, Plus } from 'lucide-react';
+import { Star, Share2, Loader2, Plus } from 'lucide-react';
 import { useElementOnScreen } from '../hooks/useIntersectionObserver';
 
 interface FeedItemProps {
@@ -97,23 +97,16 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
 
         <div className="flex flex-col items-center">
           <button className="p-1 text-white drop-shadow-lg transition active:scale-90">
-            <Heart size={36} fill={(videoData.likes || 0) > 1000 ? "#fe2c55" : "transparent"} strokeWidth={1.5} className={(videoData.likes || 0) > 1000 ? "text-[#fe2c55]" : ""} />
+            <Star size={36} fill={(videoData.likes || 0) > 1000 ? "#fe2c55" : "transparent"} strokeWidth={1.5} className={(videoData.likes || 0) > 1000 ? "text-[#fe2c55]" : ""} />
           </button>
-          <span className="text-xs font-semibold drop-shadow-md mt-1">{videoData.likes || 0}</span>
-        </div>
-
-        <div className="flex flex-col items-center">
-          <button className="p-1 text-white drop-shadow-lg active:scale-90 transition-transform">
-            <MessageCircle size={36} strokeWidth={1.5} fill="transparent" />
-          </button>
-          <span className="text-xs font-semibold drop-shadow-md mt-1">245</span>
+          <span className="text-xs font-semibold drop-shadow-md mt-1 text-white">{videoData.likes || 0}</span>
         </div>
 
         <div className="flex flex-col items-center">
           <button className="p-1 text-white drop-shadow-lg active:scale-90 transition-transform">
             <Share2 size={36} strokeWidth={1.5} />
           </button>
-          <span className="text-xs font-semibold mt-1">Share</span>
+          <span className="text-xs font-semibold mt-1 text-white">Share</span>
         </div>
       </div>
 
@@ -122,19 +115,13 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
         <div className="w-[85%] pointer-events-auto">
           <h3 
             onClick={goToChannel}
-            className="text-shadow font-bold text-lg mb-1 cursor-pointer hover:underline inline-block"
+            className="text-shadow font-bold text-lg mb-1 cursor-pointer hover:underline inline-block text-white"
           >
             @{videoData.uploaderId || 'unknown'}
           </h3>
-          <p className="text-shadow text-sm text-gray-100 line-clamp-2 mb-2 leading-tight">
+          <p className="text-shadow text-sm text-white line-clamp-2 mb-2 leading-tight">
             {videoData.description || videoData.title}
           </p>
-          {videoData.branches.length > 0 && (
-            <div className="flex items-center gap-2 text-[11px] font-bold bg-white/10 w-fit px-2 py-1 rounded backdrop-blur-md border border-white/10">
-              <GitBranch size={14} className="text-pink-400" />
-              <span>Interactive Story</span>
-            </div>
-          )}
         </div>
       </div>
     </div>

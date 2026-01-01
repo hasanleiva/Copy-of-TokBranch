@@ -1,22 +1,57 @@
 import React, { useState } from 'react';
 import { ChevronLeft, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { useAuth } from '../services/authContext';
 
 export const MyAccount: React.FC = () => {
   const navigate = useNavigate();
+  const { updateUserPassword } = useAuth();
+  
   const [oldPass, setOldPass] = useState('');
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setSuccess(false);
+
     if (newPass !== confirmPass) {
-      alert("New passwords do not match!");
+      setError("New passwords do not match.");
       return;
     }
-    // Mock save
-    alert("Password updated successfully!");
-    navigate(-1);
+
+    if (newPass.length < 6) {
+      setError("Password should be at least 6 characters.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await updateUserPassword(oldPass, newPass);
+      setSuccess(true);
+      setOldPass('');
+      setNewPass('');
+      setConfirmPass('');
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('Current password is incorrect.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('New password is too weak.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many failed attempts. Please try again later.');
+      } else {
+        setError(err.message || 'Failed to update password.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -40,6 +75,18 @@ export const MyAccount: React.FC = () => {
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
+          {error && (
+            <div className="bg-red-50 text-red-500 text-xs p-3 rounded-lg text-center border border-red-100 break-words">
+              {error}
+            </div>
+          )}
+          
+          {success && (
+            <div className="bg-green-50 text-green-600 text-xs p-3 rounded-lg text-center border border-green-100 break-words font-semibold">
+              Password updated successfully!
+            </div>
+          )}
+
           <div className="bg-white p-4 rounded-xl border border-gray-100 space-y-4 shadow-sm">
             <div>
               <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 px-1">Current Password</label>
@@ -78,9 +125,12 @@ export const MyAccount: React.FC = () => {
 
           <button
             type="submit"
-            className="w-full bg-[#fe2c55] text-white font-bold py-3.5 rounded-xl transition-all transform active:scale-[0.98] shadow-md shadow-pink-500/20 hover:bg-[#e6264c] mt-4"
+            disabled={isLoading}
+            className="w-full bg-[#fe2c55] text-white font-bold py-3.5 rounded-xl transition-all transform active:scale-[0.98] shadow-md shadow-pink-500/20 hover:bg-[#e6264c] mt-4 flex items-center justify-center"
           >
-            Update Password
+            {isLoading ? (
+               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            ) : 'Update Password'}
           </button>
         </form>
       </div>
