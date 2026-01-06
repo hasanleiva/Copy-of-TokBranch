@@ -1,47 +1,64 @@
 import { VideoData, UserProfile } from '../types';
 
-// Get the Storage URL from environment variables (e.g., https://my-zone.b-cdn.net)
-const BUNNY_STORAGE_URL = (import.meta as any).env?.VITE_BUNNY_STORAGE_URL;
+// Hardcoded Storage URL (Bunny CDN) as requested
+const BUNNY_STORAGE_URL = "https://my-replaygram.b-cdn.net";
 
 export const VideoService = {
   fetchVideoData: async (path: string): Promise<VideoData> => {
+    // 1. Sanitize the Base URL (remove trailing slashes)
+    const baseUrl = BUNNY_STORAGE_URL.replace(/\/+$/, '');
+    
     let fetchUrl = path;
 
-    // Logic to construct the URL:
-    // 1. If it's already a full URL (http...), use it.
-    // 2. Otherwise, enforce usage of BUNNY_STORAGE_URL.
+    // 2. Construct the full URL if it's a relative path
     if (!path.startsWith('http')) {
-      if (!BUNNY_STORAGE_URL) {
-        console.error("VITE_BUNNY_STORAGE_URL is missing. Cannot fetch video configuration.");
-        throw new Error("Storage configuration missing. Please check your .env file.");
-      }
-
-      // Strip any local folder prefixes like "/data/" if they exist in the JSON
-      // This allows the app to work with a flat structure on Bunny Storage
       const fileName = path.split('/').pop(); 
       const cleanName = fileName?.startsWith('/') ? fileName.slice(1) : fileName;
-      fetchUrl = `${BUNNY_STORAGE_URL}/${cleanName}`;
+      fetchUrl = `${baseUrl}/${cleanName}`;
     }
 
     try {
+      // 3. Add timestamp to prevent caching issues during development
+      // const cacheBuster = `?t=${Date.now()}`; 
+      // Note: Enabling cache buster might cause 403 on some CDNs if not configured, keeping simple for now.
+      
+      console.log(`[VideoService] Fetching: ${fetchUrl}`);
       const response = await fetch(fetchUrl);
+      
       if (!response.ok) {
-        throw new Error(`Failed to load video config at ${fetchUrl}`);
+        throw new Error(`Server returned ${response.status} ${response.statusText} for ${fetchUrl}`);
       }
+      
       const data: VideoData = await response.json();
+
+      // --- AUTO-FIX: Resolve relative video paths to CDN ---
+      if (data.mainVideoUrl && !data.mainVideoUrl.startsWith('http')) {
+         const cleanVideo = data.mainVideoUrl.replace(/^\/+/, ''); 
+         data.mainVideoUrl = `${baseUrl}/${cleanVideo}`;
+      }
+      
+      if (data.branches) {
+        data.branches.forEach(b => {
+           if (b.targetVideoUrl && !b.targetVideoUrl.startsWith('http')) {
+             const cleanTarget = b.targetVideoUrl.replace(/^\/+/, '');
+             b.targetVideoUrl = `${baseUrl}/${cleanTarget}`;
+           }
+        });
+      }
+
       return data;
     } catch (error) {
-      console.error("VideoService Error:", error);
-      throw error;
+      console.error("[VideoService] Error:", error);
+      throw error; // Re-throw to be caught by the component
     }
   },
 
   getFeedPaths: async (): Promise<string[]> => {
-    // Return only filenames. fetchVideoData will append the BUNNY_STORAGE_URL.
+    // Return filenames expected to exist in your Bunny Storage
     return Promise.resolve(['feed_1.json', 'feed_2.json']);
   },
 
-  // Generate mock videos for the dashboard - Expanded to include high view count videos
+  // Generate mock videos for the dashboard
   getTopVideos: async (): Promise<VideoData[]> => {
     return [
       {
@@ -238,28 +255,22 @@ export const VideoService = {
 
   getUserProfile: async (username: string): Promise<UserProfile> => {
     const targetUsername = username.replace('@', '');
-    
-    // Scan feed paths to find videos belonging to this user
     const feedPaths = await VideoService.getFeedPaths();
     const matchedVideos: VideoData[] = [];
 
     for (const path of feedPaths) {
       try {
         const video = await VideoService.fetchVideoData(path);
-        // loose match to handle potential case differences or missing fields in mock data
         if (video.uploaderId === targetUsername) {
-          // Ensure display fields exist
           const videoForGrid = {
             ...video,
-            // Use existing ID or fallback to path
             id: video.id || path,
-            // Add a mock view count if missing from JSON
             views: video.views || (Math.floor(Math.random() * 900) + 100 + 'K') 
           };
           matchedVideos.push(videoForGrid);
         }
       } catch (err) {
-        console.warn(`Could not load ${path} for profile scanning.`);
+        // Ignore errors in background scan
       }
     }
 

@@ -5,7 +5,7 @@ import { VideoData, Branch } from '../types';
 import { VideoService } from '../services/mockData';
 import { FirestoreService } from '../services/firestoreService';
 import { useAuth } from '../services/authContext';
-import { Star, Share2, Loader2, Plus } from 'lucide-react';
+import { Star, Share2, Loader2, Plus, AlertCircle, RefreshCcw } from 'lucide-react';
 import { useElementOnScreen } from '../hooks/useIntersectionObserver';
 
 interface FeedItemProps {
@@ -23,30 +23,29 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
 
   const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Real-time stats
   const [isLiked, setIsLiked] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
 
   // Load initial JSON data
-  useEffect(() => {
-    let isMounted = true;
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const data = await VideoService.fetchVideoData(jsonPath);
-        if (isMounted) {
-          setVideoData(data);
-        }
-      } catch (e) {
-        console.error("Error loading video json:", e);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await VideoService.fetchVideoData(jsonPath);
+      setVideoData(data);
+    } catch (e: any) {
+      console.error("Error loading video json:", e);
+      setError(e.message || "Failed to load content");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadData();
-    return () => { isMounted = false; };
   }, [jsonPath]);
 
   // Firestore Integration
@@ -78,8 +77,10 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
     try {
       const nextData = await VideoService.fetchVideoData(branch.targetJson);
       setVideoData(nextData);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error loading branch json:", e);
+      // Optional: Show toast error here instead of full screen error
+      alert("Could not load next video segment: " + e.message);
     } finally {
       setLoading(false);
     }
@@ -110,10 +111,26 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
     }
   };
 
+  if (error) {
+    return (
+      <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center bg-gray-900 snap-start text-white p-6 text-center">
+        <AlertCircle className="w-12 h-12 text-red-500 mb-4 opacity-80" />
+        <h3 className="text-lg font-bold mb-2">Content Unavailable</h3>
+        <p className="text-sm text-gray-400 mb-6 break-all">{error}</p>
+        <button 
+          onClick={loadData} 
+          className="flex items-center gap-2 px-6 py-3 bg-[#fe2c55] rounded-full text-sm font-bold hover:bg-[#e6264c] transition-colors active:scale-95"
+        >
+          <RefreshCcw size={16} /> Retry
+        </button>
+      </div>
+    );
+  }
+
   if (loading || !videoData) {
     return (
       <div ref={containerRef} className="w-full h-full flex items-center justify-center bg-gray-900 snap-start">
-        <Loader2 className="text-pink-500 animate-spin" />
+        <Loader2 className="text-pink-500 animate-spin w-10 h-10" />
       </div>
     );
   }
