@@ -1,7 +1,6 @@
 import { VideoData, UserProfile } from '../types';
 
 // Get the Storage URL from environment variables (e.g., https://my-zone.b-cdn.net)
-// If not set, it falls back to local behavior
 const BUNNY_STORAGE_URL = (import.meta as any).env?.VITE_BUNNY_STORAGE_URL;
 
 export const VideoService = {
@@ -10,16 +9,18 @@ export const VideoService = {
 
     // Logic to construct the URL:
     // 1. If it's already a full URL (http...), use it.
-    // 2. If BUNNY_STORAGE_URL is set, assume the file is in the root of the storage zone.
-    // 3. If no env var, use the path as is (local /data/...).
+    // 2. Otherwise, enforce usage of BUNNY_STORAGE_URL.
     if (!path.startsWith('http')) {
-      if (BUNNY_STORAGE_URL) {
-        // Strip any local folder prefixes like "/data/" if the user uploaded files to the root of the bucket
-        const fileName = path.split('/').pop(); 
-        // Remove leading slash from fileName if it exists (though pop() usually handles it)
-        const cleanName = fileName?.startsWith('/') ? fileName.slice(1) : fileName;
-        fetchUrl = `${BUNNY_STORAGE_URL}/${cleanName}`;
+      if (!BUNNY_STORAGE_URL) {
+        console.error("VITE_BUNNY_STORAGE_URL is missing. Cannot fetch video configuration.");
+        throw new Error("Storage configuration missing. Please check your .env file.");
       }
+
+      // Strip any local folder prefixes like "/data/" if they exist in the JSON
+      // This allows the app to work with a flat structure on Bunny Storage
+      const fileName = path.split('/').pop(); 
+      const cleanName = fileName?.startsWith('/') ? fileName.slice(1) : fileName;
+      fetchUrl = `${BUNNY_STORAGE_URL}/${cleanName}`;
     }
 
     try {
@@ -36,12 +37,8 @@ export const VideoService = {
   },
 
   getFeedPaths: async (): Promise<string[]> => {
-    // If using Bunny, we return the filenames. The fetchVideoData will attach the Base URL.
-    // If local, we return the relative paths in public folder.
-    if (BUNNY_STORAGE_URL) {
-      return Promise.resolve(['feed_1.json', 'feed_2.json']);
-    }
-    return Promise.resolve(['/data/feed_1.json', '/data/feed_2.json']);
+    // Return only filenames. fetchVideoData will append the BUNNY_STORAGE_URL.
+    return Promise.resolve(['feed_1.json', 'feed_2.json']);
   },
 
   // Generate mock videos for the dashboard - Expanded to include high view count videos

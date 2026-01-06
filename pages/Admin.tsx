@@ -113,12 +113,12 @@ export const Admin: React.FC = () => {
                  />
                </div>
                <div>
-                 <label className="text-[10px] font-bold text-gray-500 px-1">Target JSON</label>
+                 <label className="text-[10px] font-bold text-gray-500 px-1">Target JSON Filename</label>
                  <div className="flex gap-2">
                     <input 
                         value={targetJson} onChange={e => setTargetJson(e.target.value)}
                         className="w-full bg-white rounded-lg p-2.5 text-xs border border-gray-200 focus:outline-none"
-                        placeholder="/data/level2.json"
+                        placeholder="level2.json"
                     />
                     <button 
                         type="button"
