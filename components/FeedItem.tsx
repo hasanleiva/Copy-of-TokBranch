@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-// Changed import from 'react-router-dom' to 'react-router' to fix missing export errors
 import { useNavigate } from 'react-router';
 import { VideoPlayer } from './VideoPlayer';
 import { VideoData, Branch } from '../types';
 import { VideoService } from '../services/mockData';
+import { FirestoreService } from '../services/firestoreService';
+import { useAuth } from '../services/authContext';
 import { Star, Share2, Loader2, Plus } from 'lucide-react';
 import { useElementOnScreen } from '../hooks/useIntersectionObserver';
 
@@ -15,20 +16,28 @@ interface FeedItemProps {
 
 export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMuted }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [containerRef, isVisible] = useElementOnScreen({
     threshold: 0.6,
   });
 
   const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Real-time stats
+  const [isLiked, setIsLiked] = useState(false);
+  const [hasViewed, setHasViewed] = useState(false);
 
+  // Load initial JSON data
   useEffect(() => {
     let isMounted = true;
     const loadData = async () => {
       setLoading(true);
       try {
         const data = await VideoService.fetchVideoData(jsonPath);
-        if (isMounted) setVideoData(data);
+        if (isMounted) {
+          setVideoData(data);
+        }
       } catch (e) {
         console.error("Error loading video json:", e);
       } finally {
@@ -40,6 +49,30 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
     return () => { isMounted = false; };
   }, [jsonPath]);
 
+  // Firestore Integration
+  useEffect(() => {
+    if (!videoData?.id) return;
+
+    // Check if current user has liked this video
+    const checkUserLike = async () => {
+      if (user) {
+        const liked = await FirestoreService.checkIfLiked(user.id, videoData.id!);
+        setIsLiked(liked);
+      } else {
+        setIsLiked(false);
+      }
+    };
+    checkUserLike();
+  }, [videoData?.id, user]);
+
+  // Handle View Counting
+  useEffect(() => {
+    if (isVisible && !hasViewed && videoData?.id) {
+      FirestoreService.incrementView(videoData.id);
+      setHasViewed(true);
+    }
+  }, [isVisible, hasViewed, videoData?.id]);
+
   const handleBranchSelect = async (branch: Branch) => {
     setLoading(true);
     try {
@@ -49,6 +82,25 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
       console.error("Error loading branch json:", e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLike = async () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    if (!videoData) return;
+
+    // Optimistic update
+    const prevLiked = isLiked;
+    setIsLiked(!prevLiked);
+
+    try {
+      await FirestoreService.toggleLike(user.id, videoData, prevLiked);
+    } catch (e) {
+      // Revert on error
+      setIsLiked(prevLiked);
     }
   };
 
@@ -96,10 +148,18 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
         </div>
 
         <div className="flex flex-col items-center">
-          <button className="p-1 text-white drop-shadow-lg transition active:scale-90">
-            <Star size={36} fill={(videoData.likes || 0) > 1000 ? "#fe2c55" : "transparent"} strokeWidth={1.5} className={(videoData.likes || 0) > 1000 ? "text-[#fe2c55]" : ""} />
+          <button 
+            onClick={handleLike}
+            className="p-1 text-white drop-shadow-lg transition active:scale-90"
+          >
+            <Star 
+              size={36} 
+              fill={isLiked ? "#fe2c55" : "transparent"} 
+              strokeWidth={1.5} 
+              className={isLiked ? "text-[#fe2c55]" : ""} 
+            />
           </button>
-          <span className="text-xs font-semibold drop-shadow-md mt-1 text-white">{videoData.likes || 0}</span>
+          {/* Like count removed */}
         </div>
 
         <div className="flex flex-col items-center">

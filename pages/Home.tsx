@@ -10,7 +10,7 @@ export const Home: React.FC = () => {
   
   // Dashboard Data
   const [topVideos, setTopVideos] = useState<VideoData[]>([]);
-  const [mostLoved, setMostLoved] = useState<VideoData[]>([]);
+  const [newVideos, setNewVideos] = useState<VideoData[]>([]);
   const [channels, setChannels] = useState<Partial<UserProfile>[]>([]);
   
   // Search Data
@@ -23,10 +23,10 @@ export const Home: React.FC = () => {
       setLoading(true);
       try {
         const top = await VideoService.getTopVideos();
-        const loved = await VideoService.getMostLovedVideos();
+        const newVids = await VideoService.getNewVideos();
         const creators = await VideoService.getChannels();
         setTopVideos(top);
-        setMostLoved(loved);
+        setNewVideos(newVids);
         setChannels(creators);
       } catch (e) {
         console.error(e);
@@ -122,8 +122,27 @@ export const Home: React.FC = () => {
         </div>
       ) : (
         <>
+          {/* Channels to Follow Section */}
+          <div className="mt-2 mb-2">
+            <div className="flex items-center justify-between px-4 mb-2">
+              <h2 className="text-base font-bold text-black">Channels to Follow</h2>
+              <button className="text-xs text-gray-500 hover:text-black font-medium">View all</button>
+            </div>
+            
+            <div className="flex overflow-x-auto px-4 gap-4 no-scrollbar pb-2">
+              {channels.map((channel, idx) => (
+                <div key={idx} className="flex-none w-[80px] flex flex-col items-center cursor-pointer" onClick={() => navigate(`/channel/@${channel.username}`)}>
+                  <div className="w-16 h-16 rounded-full overflow-hidden border border-gray-200 hover:border-pink-500 transition-colors mb-1.5 shadow-sm">
+                    <img src={channel.avatarUrl} alt={channel.username} className="w-full h-full object-cover" />
+                  </div>
+                  <h3 className="text-[11px] font-bold text-center truncate w-full text-gray-800">{channel.username}</h3>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Top Videos Section */}
-          <div className="mt-1">
+          <div className="mt-2">
             <div className="flex items-center justify-between px-4 mb-2">
               <h2 className="text-base font-bold text-black">Top Videos</h2>
               <button 
@@ -150,12 +169,12 @@ export const Home: React.FC = () => {
             </div>
           </div>
 
-          {/* Most Loved Videos Section */}
-          <div className="mt-2">
+          {/* New Videos Section */}
+          <div className="mt-4 mb-4">
             <div className="flex items-center justify-between px-4 mb-2">
-              <h2 className="text-base font-bold text-black">Most Loved Videos</h2>
+              <h2 className="text-base font-bold text-black">New Videos</h2>
               <button 
-                onClick={() => navigate('/section/most-loved')}
+                onClick={() => navigate('/section/new-videos')}
                 className="text-xs text-gray-500 hover:text-black font-medium"
               >
                 View all
@@ -163,7 +182,7 @@ export const Home: React.FC = () => {
             </div>
             
             <div className="flex overflow-x-auto px-4 gap-3 no-scrollbar pb-2">
-              {mostLoved.map((video, idx) => (
+              {newVideos.map((video, idx) => (
                 <div key={idx} className="flex-none w-[130px] group cursor-pointer" onClick={() => navigate('/explore')}>
                   <div className="relative aspect-[3/4] rounded-lg overflow-hidden mb-1.5 shadow-sm">
                     <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -172,26 +191,7 @@ export const Home: React.FC = () => {
                     </div>
                   </div>
                   <h3 className="text-xs font-bold truncate leading-tight text-gray-900">{video.title}</h3>
-                  <p className="text-[10px] text-gray-500 mt-0.5 truncate">@{video.uploaderId}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Channels to Follow Section */}
-          <div className="mt-2 mb-4">
-            <div className="flex items-center justify-between px-4 mb-2">
-              <h2 className="text-base font-bold text-black">Channels to Follow</h2>
-              <button className="text-xs text-gray-500 hover:text-black font-medium">View all</button>
-            </div>
-            
-            <div className="flex overflow-x-auto px-4 gap-4 no-scrollbar pb-2">
-              {channels.map((channel, idx) => (
-                <div key={idx} className="flex-none w-[80px] flex flex-col items-center cursor-pointer" onClick={() => navigate(`/channel/@${channel.username}`)}>
-                  <div className="w-16 h-16 rounded-full overflow-hidden border border-gray-200 hover:border-pink-500 transition-colors mb-1.5 shadow-sm">
-                    <img src={channel.avatarUrl} alt={channel.username} className="w-full h-full object-cover" />
-                  </div>
-                  <h3 className="text-[11px] font-bold text-center truncate w-full text-gray-800">{channel.username}</h3>
+                  <p className="text-[10px] text-gray-500 mt-0.5 truncate">Fresh content</p>
                 </div>
               ))}
             </div>

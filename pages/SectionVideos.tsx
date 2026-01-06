@@ -11,17 +11,23 @@ export const SectionVideos: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   // Map URL param to display title
-  const title = type === 'top-videos' ? 'Top Video' : 'Most Loved';
+  let title = 'Videos';
+  if (type === 'top-videos') title = 'Top Videos';
+  else if (type === 'most-loved') title = 'Most Loved';
+  else if (type === 'new-videos') title = 'New Videos';
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // In a real app, we'd fetch specific lists. 
-        // Here we just fetch mocks based on type
-        const data = type === 'top-videos' 
-          ? await VideoService.getTopVideos()
-          : await VideoService.getMostLovedVideos();
+        let data: VideoData[] = [];
+        if (type === 'top-videos') {
+           data = await VideoService.getTopVideos();
+        } else if (type === 'new-videos') {
+           data = await VideoService.getNewVideos();
+        } else {
+           data = await VideoService.getMostLovedVideos();
+        }
         
         // Duplicate data to fill the grid for demo purposes
         setVideos([...data, ...data, ...data]);
