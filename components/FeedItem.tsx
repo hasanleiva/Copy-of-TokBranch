@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { VideoPlayer } from './VideoPlayer';
@@ -9,12 +10,12 @@ import { Star, Share2, Loader2, Plus, AlertCircle, RefreshCcw } from 'lucide-rea
 import { useElementOnScreen } from '../hooks/useIntersectionObserver';
 
 interface FeedItemProps {
-  jsonPath: string;
+  videoId: string; // Changed from jsonPath
   isMuted: boolean;
   setIsMuted: (val: boolean) => void;
 }
 
-export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMuted }) => {
+export const FeedItem: React.FC<FeedItemProps> = ({ videoId, isMuted, setIsMuted }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [containerRef, isVisible] = useElementOnScreen({
@@ -25,34 +26,30 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Real-time stats
   const [isLiked, setIsLiked] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
 
-  // Load initial JSON data
-  const loadData = async () => {
+  const loadData = async (id: string) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await VideoService.fetchVideoData(jsonPath);
+      const data = await VideoService.fetchVideoData(id);
       setVideoData(data);
     } catch (e: any) {
-      console.error("Error loading video json:", e);
-      setError(e.message || "Failed to load content");
+      console.error("Error loading video data:", e);
+      setError(e.message || "Failed to load content from Firestore");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-  }, [jsonPath]);
+    loadData(videoId);
+  }, [videoId]);
 
-  // Firestore Integration
+  // Firestore Interactions
   useEffect(() => {
     if (!videoData?.id) return;
-
-    // Check if current user has liked this video
     const checkUserLike = async () => {
       if (user) {
         const liked = await FirestoreService.checkIfLiked(user.id, videoData.id!);
@@ -64,7 +61,6 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
     checkUserLike();
   }, [videoData?.id, user]);
 
-  // Handle View Counting
   useEffect(() => {
     if (isVisible && !hasViewed && videoData?.id) {
       FirestoreService.incrementView(videoData.id);
@@ -75,40 +71,32 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
   const handleBranchSelect = async (branch: Branch) => {
     setLoading(true);
     try {
+      // branch.targetJson now holds the ID of the next Firestore document
       const nextData = await VideoService.fetchVideoData(branch.targetJson);
       setVideoData(nextData);
+      setHasViewed(false); // Reset view for next segment
     } catch (e: any) {
-      console.error("Error loading branch json:", e);
-      // Optional: Show toast error here instead of full screen error
-      alert("Could not load next video segment: " + e.message);
+      console.error("Error loading branch:", e);
+      alert("Next story segment unavailable.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleLike = async () => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
+    if (!user) { navigate('/login'); return; }
     if (!videoData) return;
-
-    // Optimistic update
     const prevLiked = isLiked;
     setIsLiked(!prevLiked);
-
     try {
       await FirestoreService.toggleLike(user.id, videoData, prevLiked);
     } catch (e) {
-      // Revert on error
       setIsLiked(prevLiked);
     }
   };
 
   const goToChannel = () => {
-    if (videoData?.uploaderId) {
-      navigate(`/channel/@${videoData.uploaderId}`);
-    }
+    if (videoData?.uploaderId) navigate(`/channel/@${videoData.uploaderId}`);
   };
 
   if (error) {
@@ -117,10 +105,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
         <AlertCircle className="w-12 h-12 text-red-500 mb-4 opacity-80" />
         <h3 className="text-lg font-bold mb-2">Content Unavailable</h3>
         <p className="text-sm text-gray-400 mb-6 break-all">{error}</p>
-        <button 
-          onClick={loadData} 
-          className="flex items-center gap-2 px-6 py-3 bg-[#fe2c55] rounded-full text-sm font-bold hover:bg-[#e6264c] transition-colors active:scale-95"
-        >
+        <button onClick={() => loadData(videoId)} className="flex items-center gap-2 px-6 py-3 bg-[#fe2c55] rounded-full text-sm font-bold hover:bg-[#e6264c] transition-colors">
           <RefreshCcw size={16} /> Retry
         </button>
       </div>
@@ -136,10 +121,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
   }
 
   return (
-    <div 
-      ref={containerRef} 
-      className="w-full h-full relative snap-start snap-always shrink-0"
-    >
+    <div ref={containerRef} className="w-full h-full relative snap-start snap-always shrink-0">
       <VideoPlayer 
         src={videoData.mainVideoUrl} 
         poster={videoData.thumbnailUrl}
@@ -150,50 +132,26 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
         setIsMuted={setIsMuted}
       />
 
-      {/* UI Overlay - Side Actions */}
       <div className="absolute right-2 bottom-28 flex flex-col items-center gap-5 z-20">
-        <div className="relative mb-2">
-          <div 
-            onClick={goToChannel}
-            className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center border-2 border-white cursor-pointer active:scale-90 transition-transform overflow-hidden"
-          >
-             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${videoData.uploaderId || 'user'}`} alt="avatar" className="w-full h-full object-cover" />
+        <div className="relative mb-2" onClick={goToChannel}>
+          <div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center border-2 border-white overflow-hidden cursor-pointer">
+             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${videoData.uploaderId || 'user'}`} alt="avatar" />
           </div>
           <button className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-[#fe2c55] text-white rounded-full p-0.5 border border-white">
             <Plus size={12} strokeWidth={4} />
           </button>
         </div>
-
-        <div className="flex flex-col items-center">
-          <button 
-            onClick={handleLike}
-            className="p-1 text-white drop-shadow-lg transition active:scale-90"
-          >
-            <Star 
-              size={36} 
-              fill={isLiked ? "#fe2c55" : "transparent"} 
-              strokeWidth={1.5} 
-              className={isLiked ? "text-[#fe2c55]" : ""} 
-            />
-          </button>
-          {/* Like count removed */}
-        </div>
-
-        <div className="flex flex-col items-center">
-          <button className="p-1 text-white drop-shadow-lg active:scale-90 transition-transform">
-            <Share2 size={36} strokeWidth={1.5} />
-          </button>
-          <span className="text-xs font-semibold mt-1 text-white">Share</span>
-        </div>
+        <button onClick={handleLike} className="p-1 text-white drop-shadow-lg transition active:scale-90">
+          <Star size={36} fill={isLiked ? "#fe2c55" : "transparent"} className={isLiked ? "text-[#fe2c55]" : ""} />
+        </button>
+        <button className="p-1 text-white drop-shadow-lg active:scale-90 transition-transform">
+          <Share2 size={36} strokeWidth={1.5} />
+        </button>
       </div>
 
-      {/* UI Overlay - Bottom Info */}
       <div className="absolute bottom-16 left-0 w-full px-4 z-20 pb-4 pointer-events-none">
         <div className="w-[85%] pointer-events-auto">
-          <h3 
-            onClick={goToChannel}
-            className="text-shadow font-bold text-lg mb-1 cursor-pointer hover:underline inline-block text-white"
-          >
+          <h3 onClick={goToChannel} className="text-shadow font-bold text-lg mb-1 cursor-pointer hover:underline inline-block text-white">
             @{videoData.uploaderId || 'unknown'}
           </h3>
           <p className="text-shadow text-sm text-white line-clamp-2 mb-2 leading-tight">

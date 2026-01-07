@@ -1,45 +1,111 @@
-import { VideoData, UserProfile } from '../types';
 
-// Hardcoded Storage URL (Bunny CDN) as requested
+import { VideoData, UserProfile } from '../types';
+import { FirestoreService } from './firestoreService';
+
+// Bunny CDN Base URL
 const BUNNY_STORAGE_URL = "https://my-replaygram.b-cdn.net";
 
-export const VideoService = {
-  fetchVideoData: async (path: string): Promise<VideoData> => {
-    // 1. Sanitize the Base URL (remove trailing slashes)
-    const baseUrl = BUNNY_STORAGE_URL.replace(/\/+$/, '');
-    
-    let fetchUrl = path;
+// Initial data to populate Firestore if empty
+const INITIAL_STORY_DATA: VideoData[] = [
+  {
+    id: "feed_1",
+    title: "The Fork in the Road",
+    description: "You stand at the crossroads. The path splits into a dark forest and a sunny mountain trail. Choose wisely.",
+    likes: 1250,
+    uploaderId: "narrative_explorer",
+    thumbnailUrl: "https://images.unsplash.com/photo-1535295972055-1c762f4483e5?auto=format&fit=crop&q=80&w=800",
+    mainVideoUrl: "https://vz-8d915ecf-df3.b-cdn.net/72ef6d8a-c162-4647-a9b2-0e298ea68c8e/playlist.m3u8",
+    branches: [
+      {
+        appearAtSecond: 2,
+        PauseAtappersecond: true,
+        DurationPauseseconds: 5,
+        label: "Vini View",
+        labelpositionx: 5,
+        labelpositiony: 70,
+        targetVideoUrl: "",
+        targetJson: "forest_entry"
+      },
+      {
+        appearAtSecond: 2,
+        PauseAtappersecond: true,
+        DurationPauseseconds: 5,
+        label: "Side View",
+        labelpositionx: 75,
+        labelpositiony: 50,
+        targetVideoUrl: "",
+        targetJson: "mountain_climb"
+      }
+    ],
+    viewsCount: 5000
+  },
+  {
+    id: "forest_entry",
+    title: "Into the Woods",
+    description: "The trees are dense and the air is cold.",
+    likes: 85,
+    uploaderId: "narrative_explorer",
+    thumbnailUrl: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&q=80&w=800",
+    mainVideoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
+    branches: [
+      {
+        appearAtSecond: 5,
+        PauseAtappersecond: true,
+        label: "🔍 Investigate Sound",
+        labelpositionx: 50,
+        labelpositiony: 30,
+        targetVideoUrl: "",
+        targetJson: "forest_secret"
+      },
+      {
+        appearAtSecond: 8,
+        PauseAtappersecond: true,
+        label: "🏃 Run Back",
+        labelpositionx: 50,
+        labelpositiony: 70,
+        targetVideoUrl: "",
+        targetJson: "feed_1"
+      }
+    ],
+    viewsCount: 1200
+  },
+  {
+    id: "feed_2",
+    title: "Neon Dreams",
+    description: "A glimpse into the cyber future.",
+    likes: 5000,
+    uploaderId: "scifi_fan",
+    thumbnailUrl: "https://images.unsplash.com/photo-1535295972055-1c762f4483e5?auto=format&fit=crop&q=80&w=800",
+    mainVideoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    branches: [],
+    viewsCount: 8900
+  }
+];
 
-    // 2. Construct the full URL if it's a relative path
-    if (!path.startsWith('http')) {
-      const fileName = path.split('/').pop(); 
-      const cleanName = fileName?.startsWith('/') ? fileName.slice(1) : fileName;
-      fetchUrl = `${baseUrl}/${cleanName}`;
-    }
+export const VideoService = {
+  // Fetch from Firestore and Resolve CDN URLs
+  fetchVideoData: async (id: string): Promise<VideoData> => {
+    // Clean ID (remove path or extension if accidentally passed)
+    const cleanId = id.replace('/data/', '').replace('.json', '');
 
     try {
-      // 3. Add timestamp to prevent caching issues during development
-      // const cacheBuster = `?t=${Date.now()}`; 
-      // Note: Enabling cache buster might cause 403 on some CDNs if not configured, keeping simple for now.
+      console.log(`[VideoService] Querying Firestore for ID: ${cleanId}`);
+      const data = await FirestoreService.getVideoById(cleanId);
       
-      console.log(`[VideoService] Fetching: ${fetchUrl}`);
-      const response = await fetch(fetchUrl);
-      
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status} ${response.statusText} for ${fetchUrl}`);
+      if (!data) {
+        throw new Error(`Video configuration '${cleanId}' not found in Firestore.`);
       }
-      
-      const data: VideoData = await response.json();
 
-      // --- AUTO-FIX: Resolve relative video paths to CDN ---
+      // Resolve relative video paths to Bunny CDN
+      const baseUrl = BUNNY_STORAGE_URL.replace(/\/+$/, '');
       if (data.mainVideoUrl && !data.mainVideoUrl.startsWith('http')) {
-         const cleanVideo = data.mainVideoUrl.replace(/^\/+/, ''); 
-         data.mainVideoUrl = `${baseUrl}/${cleanVideo}`;
+         const cleanPath = data.mainVideoUrl.replace(/^\/+/, ''); 
+         data.mainVideoUrl = `${baseUrl}/${cleanPath}`;
       }
       
       if (data.branches) {
         data.branches.forEach(b => {
-           if (b.targetVideoUrl && !b.targetVideoUrl.startsWith('http')) {
+           if (b.targetVideoUrl && !b.targetVideoUrl.startsWith('http') && b.targetVideoUrl !== '') {
              const cleanTarget = b.targetVideoUrl.replace(/^\/+/, '');
              b.targetVideoUrl = `${baseUrl}/${cleanTarget}`;
            }
@@ -49,199 +115,39 @@ export const VideoService = {
       return data;
     } catch (error) {
       console.error("[VideoService] Error:", error);
-      throw error; // Re-throw to be caught by the component
+      throw error; 
     }
   },
 
-  getFeedPaths: async (): Promise<string[]> => {
-    // Return filenames expected to exist in your Bunny Storage
-    return Promise.resolve(['feed_1.json', 'feed_2.json']);
+  getFeedIds: async (): Promise<string[]> => {
+    let videos = await FirestoreService.getFeedVideos(10);
+    
+    // --- AUTO SEEDING ---
+    if (videos.length === 0) {
+      console.log("Firestore empty. Seeding initial story data...");
+      await Promise.all(INITIAL_STORY_DATA.map(v => FirestoreService.seedVideoData(v)));
+      videos = await FirestoreService.getFeedVideos(10);
+    }
+
+    // Filter to only show top-level feed items (e.g. ones starting with 'feed_')
+    return videos.filter(v => v.id?.startsWith('feed_')).map(v => v.id!);
   },
 
-  // Generate mock videos for the dashboard
+  // Legacy compatibility
+  getFeedPaths: async (): Promise<string[]> => {
+    return VideoService.getFeedIds();
+  },
+
   getTopVideos: async (): Promise<VideoData[]> => {
-    return [
-      {
-        id: 'love1',
-        title: 'Motivation Speech',
-        likes: 1500000,
-        views: '2M',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1475721027767-f4242310f17e?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'inspirer'
-      },
-      {
-        id: 'love2',
-        title: 'Fashion Week',
-        likes: 1200000,
-        views: '1.5M',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'vogue_style'
-      },
-      {
-        id: 'top1',
-        title: 'My Morning Routine',
-        likes: 980000,
-        views: '1.2M',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1535295972055-1c762f4483e5?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'lifestyle_guru'
-      },
-      {
-        id: 'love3',
-        title: 'DIY Crafts',
-        likes: 900000,
-        views: '1.1M',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1452860606245-08befc0ff44b?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'crafter'
-      },
-      {
-        id: 'love4',
-        title: 'Travel Vlog: Japan',
-        likes: 880000,
-        views: '1M',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'traveler'
-      },
-      {
-        id: 'top2',
-        title: 'Extreme Fitness',
-        likes: 850000,
-        views: '980K',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'fit_pro'
-      },
-      {
-        id: 'top3',
-        title: 'Cooking Masterclass',
-        likes: 720000,
-        views: '850K',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1556910103-1c02745a30bf?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'chef_john'
-      }
-    ];
+    return await FirestoreService.getGlobalTopVideos(7);
   },
 
   getNewVideos: async (): Promise<VideoData[]> => {
-    return [
-      {
-        id: 'new1',
-        title: 'Hidden Gems',
-        likes: 2300,
-        views: '5.4K',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'travel_bug'
-      },
-      {
-        id: 'new2',
-        title: 'Skate Tricks',
-        likes: 1200,
-        views: '3.2K',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1520045864906-820551b7142d?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'skater_boy'
-      },
-       {
-        id: 'new3',
-        title: 'Pottery Making',
-        likes: 4500,
-        views: '8.1K',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1565193566173-03a30c718527?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'artisan_hands'
-      },
-       {
-        id: 'new4',
-        title: 'Cyberpunk City',
-        likes: 8900,
-        views: '15K',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1555680202-c86f0e12f086?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'future_vision'
-      },
-       {
-        id: 'new5',
-        title: 'Forest Rain',
-        likes: 3100,
-        views: '6K',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'nature_sounds'
-      },
-       {
-        id: 'new6',
-        title: 'Late Night Drive',
-        likes: 2100,
-        views: '4.5K',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'night_rider'
-      }
-    ];
+    return await FirestoreService.getGlobalNewVideos(7);
   },
 
   getMostLovedVideos: async (): Promise<VideoData[]> => {
-    return [
-      {
-        id: 'love1',
-        title: 'Motivation Speech',
-        likes: 1500000,
-        views: '2M',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1475721027767-f4242310f17e?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'inspirer'
-      },
-      {
-        id: 'love2',
-        title: 'Fashion Week',
-        likes: 1200000,
-        views: '1.5M',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'vogue_style'
-      },
-      {
-        id: 'love3',
-        title: 'DIY Crafts',
-        likes: 900000,
-        views: '1.1M',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1452860606245-08befc0ff44b?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'crafter'
-      },
-      {
-        id: 'love4',
-        title: 'Travel Vlog: Japan',
-        likes: 880000,
-        views: '1M',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&q=80&w=800',
-        mainVideoUrl: '',
-        branches: [],
-        uploaderId: 'traveler'
-      }
-    ];
+     return VideoService.getTopVideos();
   },
 
   getChannels: async (): Promise<Partial<UserProfile>[]> => {
@@ -249,29 +155,21 @@ export const VideoService = {
       { id: '1', username: 'Jenny Wilson', followers: '1.9M', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jenny' },
       { id: '2', username: 'Lisa Alenaes', followers: '500K', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lisa' },
       { id: '3', username: 'Guy Hawkins', followers: '2.1M', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Guy' },
-      { id: '4', username: 'Robert Fox', followers: '800K', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Robert' },
     ];
   },
 
   getUserProfile: async (username: string): Promise<UserProfile> => {
     const targetUsername = username.replace('@', '');
-    const feedPaths = await VideoService.getFeedPaths();
+    const feedIds = await VideoService.getFeedIds();
     const matchedVideos: VideoData[] = [];
 
-    for (const path of feedPaths) {
+    for (const id of feedIds) {
       try {
-        const video = await VideoService.fetchVideoData(path);
+        const video = await VideoService.fetchVideoData(id);
         if (video.uploaderId === targetUsername) {
-          const videoForGrid = {
-            ...video,
-            id: video.id || path,
-            views: video.views || (Math.floor(Math.random() * 900) + 100 + 'K') 
-          };
-          matchedVideos.push(videoForGrid);
+          matchedVideos.push(video);
         }
-      } catch (err) {
-        // Ignore errors in background scan
-      }
+      } catch (err) {}
     }
 
     return Promise.resolve({
@@ -280,8 +178,8 @@ export const VideoService = {
       avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${targetUsername}`,
       followers: '1.9K',
       likes: '46K',
-      bio: 'NEVER LOSE HOPE',
-      additionalInfo: 'Additional profile information',
+      bio: 'Interactive Storyteller',
+      additionalInfo: '',
       videos: matchedVideos
     });
   },
@@ -290,17 +188,11 @@ export const VideoService = {
     const channels = [
       { id: '1', username: 'narrative_explorer', followers: '1.9K' },
       { id: '2', username: 'scifi_fan', followers: '12K' },
-      { id: '3', username: 'adventure_seeker', followers: '500' },
-      { id: '4', username: 'nature_lover', followers: '5.2K' },
-      { id: '5', username: 'tech_guru', followers: '1.1M' },
     ];
-    return Promise.resolve(
-      channels.filter(c => c.username.toLowerCase().includes(query.toLowerCase()))
-    );
+    return Promise.resolve(channels.filter(c => c.username.toLowerCase().includes(query.toLowerCase())));
   },
 
-  uploadVideo: async (data: any): Promise<void> => {
-     console.log("Mock Upload:", data);
-     return Promise.resolve();
+  uploadVideo: async (data: VideoData): Promise<void> => {
+     await FirestoreService.saveVideoMetadata(data);
   }
 };

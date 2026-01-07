@@ -1,6 +1,7 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+// Use namespaced imports for Firebase v8 compatibility
+import firebase from "firebase/app";
+import "firebase/auth";
+import "firebase/firestore";
 
 // REPLACE THE VALUES BELOW WITH YOUR FIREBASE CONSOLE CONFIGURATION
 const firebaseConfig = {
@@ -13,8 +14,14 @@ const firebaseConfig = {
   //measurementId: "G-8EZMMGTD5D"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
-export const db = getFirestore(app);
+// Initialize Firebase if no app exists
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
+
+// Export auth and db using the namespaced API
+export const auth = firebase.auth();
+export const googleProvider = new firebase.auth.GoogleAuthProvider();
+export const db = firebase.firestore();
+
+export default firebase;

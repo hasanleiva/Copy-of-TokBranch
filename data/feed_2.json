@@ -1,0 +1,10 @@
+{
+  "id": "feed_2",
+  "title": "Neon Dreams",
+  "description": "A glimpse into the cyber future. No branches here, just vibes.",
+  "likes": 5000,
+  "uploaderId": "scifi_fan",
+  "thumbnailUrl": "https://images.unsplash.com/photo-1535295972055-1c762f4483e5?auto=format&fit=crop&q=80&w=800",
+  "mainVideoUrl": "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+  "branches": []
+}
