@@ -6,13 +6,12 @@ import { FirestoreService } from './firestoreService';
 const BUNNY_STORAGE_URL = "https://my-replaygram.b-cdn.net";
 
 // STATIC DATA FOR SEEDING (Backup)
-// Map these IDs to actual JSON files in Bunny Storage for the demo
 const MOCK_DB_SEED = [
   {
     id: 'love1',
     title: 'Motivation Speech',
     likes: 1500000,
-    numericViews: 2000000,
+    numericViews: 777777,
     thumbnailUrl: 'https://images.unsplash.com/photo-1475721027767-f4242310f17e?auto=format&fit=crop&q=80&w=800',
     uploaderId: 'inspirer',
     daysAgo: 10,
@@ -70,60 +69,60 @@ const MOCK_DB_SEED = [
   }
 ];
 
+// Shuffle helper
+const shuffleArray = <T>(array: T[]): T[] => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
+
 export const VideoService = {
   fetchVideoData: async (pathOrId: string): Promise<VideoData> => {
     const baseUrl = BUNNY_STORAGE_URL.replace(/\/+$/, '');
     let jsonFilename = pathOrId;
     let explicitId: string | null = null;
 
-    // If it's not a .json path, it's a Firestore document ID
+    // Resolve Firestore ID to JSON filename
     if (!pathOrId.endsWith('.json')) {
       const doc = await FirestoreService.getVideoById(pathOrId);
       if (doc && doc.jsonName) {
         jsonFilename = doc.jsonName;
-        explicitId = pathOrId; // Save the Firestore ID to enforce it later
+        explicitId = pathOrId;
       } else {
-        throw new Error(`Video ID ${pathOrId} has no associated jsonName in Firestore.`);
+        throw new Error(`Video ID ${pathOrId} not found in Firestore metadata.`);
       }
     }
 
-    // Sanitize filename
     const cleanFilename = jsonFilename.split('/').pop()?.replace(/^\/+/, '') || '';
     const fetchUrl = `${baseUrl}/${cleanFilename}`;
 
     try {
-      console.log(`[VideoService] Fetching JSON: ${fetchUrl}`);
       const response = await fetch(fetchUrl);
-      
-      if (!response.ok) {
-        throw new Error(`Bunny Storage returned ${response.status} for ${fetchUrl}`);
-      }
+      if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
       
       const data: VideoData = await response.json();
 
-      // IMPORTANT: If we fetched this using a Firestore ID (like 'love1'), 
-      // we MUST use that ID instead of what's inside the JSON file (like 'feed_1')
-      // to ensure view counts and likes are attributed correctly in Firestore.
+      // Enforce the Firestore document ID to prevent 'feed_1' duplicates
       if (explicitId) {
         data.id = explicitId;
       }
 
-      // Resolve relative video paths to CDN
+      // Resolve relative URLs to CDN
       if (data.mainVideoUrl && !data.mainVideoUrl.startsWith('http')) {
-         const cleanVideo = data.mainVideoUrl.replace(/^\/+/, ''); 
-         data.mainVideoUrl = `${baseUrl}/${cleanVideo}`;
+         data.mainVideoUrl = `${baseUrl}/${data.mainVideoUrl.replace(/^\/+/, '')}`;
       }
       
       if (data.branches) {
         data.branches.forEach(b => {
            if (b.targetVideoUrl && !b.targetVideoUrl.startsWith('http')) {
-             const cleanTarget = b.targetVideoUrl.replace(/^\/+/, '');
-             b.targetVideoUrl = `${baseUrl}/${cleanTarget}`;
+             b.targetVideoUrl = `${baseUrl}/${b.targetVideoUrl.replace(/^\/+/, '')}`;
            }
         });
       }
 
-      // Fallback for ID if still missing
       if (!data.id && !pathOrId.endsWith('.json')) {
         data.id = pathOrId;
       }
@@ -135,15 +134,36 @@ export const VideoService = {
     }
   },
 
+  /**
+   * Fetches all available video IDs from Firestore and shuffles them for the feed.
+   */
   getFeedPaths: async (): Promise<string[]> => {
-    return Promise.resolve(['feed_1.json', 'feed_2.json']);
+    try {
+      // Fetch some top and new videos to build a pool
+      const top = await VideoService.getTopVideos();
+      const news = await VideoService.getNewVideos();
+      
+      // Combine and get unique IDs
+      const allIds = Array.from(new Set([
+        ...top.map(v => v.id!),
+        ...news.map(v => v.id!)
+      ]));
+
+      // Fallback if DB is empty
+      if (allIds.length === 0) return ['feed_1.json', 'feed_2.json'];
+
+      // Return a randomized list of IDs
+      return shuffleArray(allIds);
+    } catch (e) {
+      console.error("Failed to build randomized feed:", e);
+      return ['feed_1.json', 'feed_2.json'];
+    }
   },
 
   getTopVideos: async (): Promise<VideoData[]> => {
-    let videos = await FirestoreService.getGlobalTopVideos(7);
+    let videos = await FirestoreService.getGlobalTopVideos(10);
 
     if (videos.length === 0) {
-      console.log("Seeding Firestore...");
       const promises = MOCK_DB_SEED.map(v => 
         FirestoreService.seedVideoData({
           id: v.id,
@@ -157,17 +177,17 @@ export const VideoService = {
         }, v.numericViews, v.daysAgo)
       );
       await Promise.all(promises);
-      videos = await FirestoreService.getGlobalTopVideos(7);
+      videos = await FirestoreService.getGlobalTopVideos(10);
     }
 
     return videos;
   },
 
   getNewVideos: async (): Promise<VideoData[]> => {
-    let videos = await FirestoreService.getGlobalNewVideos(7);
+    let videos = await FirestoreService.getGlobalNewVideos(10);
     if (videos.length === 0) {
       await VideoService.getTopVideos();
-      videos = await FirestoreService.getGlobalNewVideos(7);
+      videos = await FirestoreService.getGlobalNewVideos(10);
     }
     return videos;
   },
@@ -186,45 +206,31 @@ export const VideoService = {
 
   getUserProfile: async (username: string): Promise<UserProfile> => {
     const targetUsername = username.replace('@', '');
-    const feedPaths = await VideoService.getFeedPaths();
-    const matchedVideos: VideoData[] = [];
+    const top = await VideoService.getTopVideos();
+    const news = await VideoService.getNewVideos();
+    const all = [...top, ...news];
 
-    for (const path of feedPaths) {
-      try {
-        const video = await VideoService.fetchVideoData(path);
-        if (video.uploaderId === targetUsername) {
-          const videoForGrid = {
-            ...video,
-            id: video.id || path,
-            views: video.views || (Math.floor(Math.random() * 900) + 100 + 'K') 
-          };
-          matchedVideos.push(videoForGrid);
-        }
-      } catch (err) {}
-    }
+    const matchedVideos = all.filter(v => v.uploaderId === targetUsername);
 
     return {
       id: `user_${targetUsername}`,
       username: targetUsername,
       avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${targetUsername}`,
-      followers: '1.9K',
-      likes: '46K',
-      bio: 'NEVER LOSE HOPE',
+      followers: (Math.floor(Math.random() * 50) + 1) + 'K',
+      likes: (Math.floor(Math.random() * 500) + 1) + 'K',
+      bio: 'Creating interactive stories for everyone.',
       additionalInfo: '',
       videos: matchedVideos
     };
   },
 
   searchChannels: async (query: string): Promise<Partial<UserProfile>[]> => {
-    const channels = [
-      { id: '1', username: 'narrative_explorer', followers: '1.9K' },
-      { id: '2', username: 'scifi_fan', followers: '12K' },
-    ];
-    return channels.filter(c => c.username.toLowerCase().includes(query.toLowerCase()));
+    const creators = await VideoService.getChannels();
+    return creators.filter(c => c.username?.toLowerCase().includes(query.toLowerCase()));
   },
 
   uploadVideo: async (data: any): Promise<void> => {
-     console.log("Mock Upload:", data);
+     console.log("Saving video config:", data);
      return Promise.resolve();
   }
 };
