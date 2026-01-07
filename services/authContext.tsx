@@ -1,8 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
 import { auth } from './firebaseConfig';
-// Import firebase from app for types and credential access
-import firebase from 'firebase/app';
+// Using @firebase/auth directly to ensure correct modular export resolution
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider
+} from '@firebase/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -21,8 +30,8 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Listen for Firebase Auth state changes using namespaced API
-    const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+    // Listen for Firebase Auth state changes
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         // Map Firebase user to App user
         const appUser: User = {
@@ -42,8 +51,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
 
   const loginWithEmail = async (email: string, pass: string): Promise<void> => {
     try {
-      // Refactored to namespaced method
-      await auth.signInWithEmailAndPassword(email, pass);
+      await signInWithEmailAndPassword(auth, email, pass);
     } catch (error) {
       console.error("Login failed", error);
       throw error;
@@ -52,8 +60,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
 
   const signupWithEmail = async (email: string, pass: string): Promise<void> => {
     try {
-      // Refactored to namespaced method
-      await auth.createUserWithEmailAndPassword(email, pass);
+      await createUserWithEmailAndPassword(auth, email, pass);
     } catch (error) {
       console.error("Signup failed", error);
       throw error;
@@ -62,8 +69,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
 
   const logout = async (): Promise<void> => {
     try {
-      // Refactored to namespaced method
-      await auth.signOut();
+      await signOut(auth);
       setUser(null);
     } catch (error) {
       console.error("Logout failed", error);
@@ -72,27 +78,26 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
 
   const resetPassword = async (email: string): Promise<void> => {
     try {
-      // Refactored to namespaced method
-      await auth.sendPasswordResetEmail(email);
+      await sendPasswordResetEmail(auth, email);
     } catch (error) {
       console.error("Reset password failed", error);
       throw error;
     }
   };
 
-  const updateUserPassword = async (currentPass: string, newPass: string): Promise<void> => {
+  const updateUserPassword = async (currentPass: string, newPass: string) => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser || !firebaseUser.email) {
       throw new Error("No user logged in");
     }
 
     try {
-      // Re-authenticate using the namespaced credential access
-      const credential = firebase.auth.EmailAuthProvider.credential(firebaseUser.email, currentPass);
-      await firebaseUser.reauthenticateWithCredential(credential);
+      // Re-authenticate the user first to ensure session is fresh
+      const credential = EmailAuthProvider.credential(firebaseUser.email, currentPass);
+      await reauthenticateWithCredential(firebaseUser, credential);
       
-      // Update password using the method on the user object (v8 style)
-      await firebaseUser.updatePassword(newPass);
+      // Update password
+      await updatePassword(firebaseUser, newPass);
     } catch (error) {
       console.error("Update password failed", error);
       throw error;

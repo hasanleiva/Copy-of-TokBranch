@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { ChevronLeft, Eye } from 'lucide-react';
@@ -63,7 +64,7 @@ export const SectionVideos: React.FC = () => {
                <div 
                   key={`${video.id}-${idx}`} 
                   className="relative aspect-[3/4] rounded-xl overflow-hidden cursor-pointer group shadow-sm"
-                  onClick={() => navigate('/explore')}
+                  onClick={() => navigate(`/explore/${video.id}`)}
                 >
                   <img 
                     src={video.thumbnailUrl} 

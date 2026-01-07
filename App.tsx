@@ -1,3 +1,4 @@
+
 import React from 'react';
 // Changed import from 'react-router-dom' to 'react-router' to fix missing export errors
 import { HashRouter, Routes, Route, Navigate, useLocation, Link } from 'react-router';
@@ -28,13 +29,10 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
   const { user } = useAuth();
   
   const isHome = location.pathname === '/';
-  const isExplore = location.pathname === '/explore';
+  const isExplore = location.pathname.startsWith('/explore');
   const isLibrary = location.pathname === '/library';
   const isMe = location.pathname.startsWith('/profile');
 
-  // Hide bottom nav on specific sub-pages to give more screen real estate, or keep it. 
-  // Based on standard UX, we usually keep it unless it's a deep setting page. 
-  
   return (
     <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-white relative shadow-2xl overflow-hidden text-black">
       {/* Main Content Area */}
@@ -83,6 +81,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/explore" element={<Feed />} />
+            <Route path="/explore/:startId" element={<Feed />} />
             <Route path="/library" element={<Library />} />
             <Route path="/section/:type" element={<SectionVideos />} />
             <Route path="/login" element={<Login />} />

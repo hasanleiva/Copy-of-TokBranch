@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Eye, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -82,7 +83,7 @@ export const Library: React.FC = () => {
                    <div 
                       key={`${video.id}-${idx}`} 
                       className="relative aspect-[3/4] rounded-xl overflow-hidden cursor-pointer group shadow-sm"
-                      onClick={() => navigate('/explore')}
+                      onClick={() => navigate(`/explore/${video.id}`)}
                     >
                       <img 
                         src={video.thumbnailUrl} 

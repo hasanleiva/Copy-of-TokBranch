@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Search, Eye, X, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -155,7 +156,7 @@ export const Home: React.FC = () => {
             
             <div className="flex overflow-x-auto px-4 gap-3 no-scrollbar pb-2">
               {topVideos.map((video, idx) => (
-                <div key={idx} className="flex-none w-[130px] group cursor-pointer" onClick={() => navigate('/explore')}>
+                <div key={idx} className="flex-none w-[130px] group cursor-pointer" onClick={() => navigate(`/explore/${video.id}`)}>
                   <div className="relative aspect-[3/4] rounded-lg overflow-hidden mb-1.5 shadow-sm">
                     <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 text-[9px] font-bold shadow-black drop-shadow-md bg-black/40 text-white px-1.5 py-0.5 rounded-full backdrop-blur-sm">
@@ -183,7 +184,7 @@ export const Home: React.FC = () => {
             
             <div className="flex overflow-x-auto px-4 gap-3 no-scrollbar pb-2">
               {newVideos.map((video, idx) => (
-                <div key={idx} className="flex-none w-[130px] group cursor-pointer" onClick={() => navigate('/explore')}>
+                <div key={idx} className="flex-none w-[130px] group cursor-pointer" onClick={() => navigate(`/explore/${video.id}`)}>
                   <div className="relative aspect-[3/4] rounded-lg overflow-hidden mb-1.5 shadow-sm">
                     <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 text-[9px] font-bold shadow-black drop-shadow-md bg-black/40 text-white px-1.5 py-0.5 rounded-full backdrop-blur-sm">

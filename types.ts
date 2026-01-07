@@ -6,22 +6,21 @@ export interface Branch {
   label: string;
   labelpositionx: number; // Percentage 0-100
   labelpositiony: number; // Percentage 0-100
-  targetVideoUrl: string; // Optional direct link
-  targetJson: string; // Now represents the Firestore Document ID of the next video
+  targetVideoUrl: string;
+  targetJson: string; // Path to the next JSON file
 }
 
 export interface VideoData {
-  id?: string;
   mainVideoUrl: string;
   branches: Branch[];
+  id?: string;
   title?: string;
   description?: string;
   likes?: number;
   uploaderId?: string;
   thumbnailUrl?: string;
-  views?: string; // Formatted string for UI (e.g. "1.2K")
-  viewsCount?: number; // Numeric value for sorting in Firestore
-  createdAt?: any; // Firestore Timestamp
+  views?: string; // e.g. "2.1M"
+  jsonName?: string; // The specific filename in Bunny Storage (e.g. "feed_1.json")
 }
 
 export interface User {

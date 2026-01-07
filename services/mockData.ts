@@ -2,148 +2,174 @@
 import { VideoData, UserProfile } from '../types';
 import { FirestoreService } from './firestoreService';
 
-// Bunny CDN Base URL
+// Hardcoded Storage URL (Bunny CDN)
 const BUNNY_STORAGE_URL = "https://my-replaygram.b-cdn.net";
 
-// Initial data to populate Firestore if empty
-const INITIAL_STORY_DATA: VideoData[] = [
+// STATIC DATA FOR SEEDING (Backup)
+// Map these IDs to actual JSON files in Bunny Storage for the demo
+const MOCK_DB_SEED = [
   {
-    id: "feed_1",
-    title: "The Fork in the Road",
-    description: "You stand at the crossroads. The path splits into a dark forest and a sunny mountain trail. Choose wisely.",
-    likes: 1250,
-    uploaderId: "narrative_explorer",
-    thumbnailUrl: "https://images.unsplash.com/photo-1535295972055-1c762f4483e5?auto=format&fit=crop&q=80&w=800",
-    mainVideoUrl: "https://vz-8d915ecf-df3.b-cdn.net/72ef6d8a-c162-4647-a9b2-0e298ea68c8e/playlist.m3u8",
-    branches: [
-      {
-        appearAtSecond: 2,
-        PauseAtappersecond: true,
-        DurationPauseseconds: 5,
-        label: "Vini View",
-        labelpositionx: 5,
-        labelpositiony: 70,
-        targetVideoUrl: "",
-        targetJson: "forest_entry"
-      },
-      {
-        appearAtSecond: 2,
-        PauseAtappersecond: true,
-        DurationPauseseconds: 5,
-        label: "Side View",
-        labelpositionx: 75,
-        labelpositiony: 50,
-        targetVideoUrl: "",
-        targetJson: "mountain_climb"
-      }
-    ],
-    viewsCount: 5000
+    id: 'love1',
+    title: 'Motivation Speech',
+    likes: 1500000,
+    numericViews: 2000000,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1475721027767-f4242310f17e?auto=format&fit=crop&q=80&w=800',
+    uploaderId: 'inspirer',
+    daysAgo: 10,
+    jsonName: 'feed_1.json'
   },
   {
-    id: "forest_entry",
-    title: "Into the Woods",
-    description: "The trees are dense and the air is cold.",
-    likes: 85,
-    uploaderId: "narrative_explorer",
-    thumbnailUrl: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&q=80&w=800",
-    mainVideoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
-    branches: [
-      {
-        appearAtSecond: 5,
-        PauseAtappersecond: true,
-        label: "🔍 Investigate Sound",
-        labelpositionx: 50,
-        labelpositiony: 30,
-        targetVideoUrl: "",
-        targetJson: "forest_secret"
-      },
-      {
-        appearAtSecond: 8,
-        PauseAtappersecond: true,
-        label: "🏃 Run Back",
-        labelpositionx: 50,
-        labelpositiony: 70,
-        targetVideoUrl: "",
-        targetJson: "feed_1"
-      }
-    ],
-    viewsCount: 1200
+    id: 'love2',
+    title: 'Fashion Week',
+    likes: 1200000,
+    numericViews: 1500000,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&q=80&w=800',
+    uploaderId: 'vogue_style',
+    daysAgo: 12,
+    jsonName: 'feed_2.json'
   },
   {
-    id: "feed_2",
-    title: "Neon Dreams",
-    description: "A glimpse into the cyber future.",
-    likes: 5000,
-    uploaderId: "scifi_fan",
-    thumbnailUrl: "https://images.unsplash.com/photo-1535295972055-1c762f4483e5?auto=format&fit=crop&q=80&w=800",
-    mainVideoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    branches: [],
-    viewsCount: 8900
+    id: 'new1',
+    title: 'Hidden Gems',
+    likes: 2300,
+    numericViews: 5400,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&q=80&w=800',
+    uploaderId: 'travel_bug',
+    daysAgo: 0,
+    jsonName: 'feed_1.json'
+  },
+  {
+    id: 'new2',
+    title: 'Skate Tricks',
+    likes: 1200,
+    numericViews: 3200,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1520045864906-820551b7142d?auto=format&fit=crop&q=80&w=800',
+    uploaderId: 'skater_boy',
+    daysAgo: 1,
+    jsonName: 'feed_2.json'
+  },
+  {
+    id: 'top1',
+    title: 'My Morning Routine',
+    likes: 980000,
+    numericViews: 1200000,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1535295972055-1c762f4483e5?auto=format&fit=crop&q=80&w=800',
+    uploaderId: 'lifestyle_guru',
+    daysAgo: 15,
+    jsonName: 'feed_1.json'
+  },
+  {
+    id: 'top2',
+    title: 'Extreme Fitness',
+    likes: 850000,
+    numericViews: 980000,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=800',
+    uploaderId: 'fit_pro',
+    daysAgo: 8,
+    jsonName: 'feed_2.json'
   }
 ];
 
 export const VideoService = {
-  // Fetch from Firestore and Resolve CDN URLs
-  fetchVideoData: async (id: string): Promise<VideoData> => {
-    // Clean ID (remove path or extension if accidentally passed)
-    const cleanId = id.replace('/data/', '').replace('.json', '');
+  fetchVideoData: async (pathOrId: string): Promise<VideoData> => {
+    const baseUrl = BUNNY_STORAGE_URL.replace(/\/+$/, '');
+    let jsonFilename = pathOrId;
+    let explicitId: string | null = null;
+
+    // If it's not a .json path, it's a Firestore document ID
+    if (!pathOrId.endsWith('.json')) {
+      const doc = await FirestoreService.getVideoById(pathOrId);
+      if (doc && doc.jsonName) {
+        jsonFilename = doc.jsonName;
+        explicitId = pathOrId; // Save the Firestore ID to enforce it later
+      } else {
+        throw new Error(`Video ID ${pathOrId} has no associated jsonName in Firestore.`);
+      }
+    }
+
+    // Sanitize filename
+    const cleanFilename = jsonFilename.split('/').pop()?.replace(/^\/+/, '') || '';
+    const fetchUrl = `${baseUrl}/${cleanFilename}`;
 
     try {
-      console.log(`[VideoService] Querying Firestore for ID: ${cleanId}`);
-      const data = await FirestoreService.getVideoById(cleanId);
+      console.log(`[VideoService] Fetching JSON: ${fetchUrl}`);
+      const response = await fetch(fetchUrl);
       
-      if (!data) {
-        throw new Error(`Video configuration '${cleanId}' not found in Firestore.`);
+      if (!response.ok) {
+        throw new Error(`Bunny Storage returned ${response.status} for ${fetchUrl}`);
+      }
+      
+      const data: VideoData = await response.json();
+
+      // IMPORTANT: If we fetched this using a Firestore ID (like 'love1'), 
+      // we MUST use that ID instead of what's inside the JSON file (like 'feed_1')
+      // to ensure view counts and likes are attributed correctly in Firestore.
+      if (explicitId) {
+        data.id = explicitId;
       }
 
-      // Resolve relative video paths to Bunny CDN
-      const baseUrl = BUNNY_STORAGE_URL.replace(/\/+$/, '');
+      // Resolve relative video paths to CDN
       if (data.mainVideoUrl && !data.mainVideoUrl.startsWith('http')) {
-         const cleanPath = data.mainVideoUrl.replace(/^\/+/, ''); 
-         data.mainVideoUrl = `${baseUrl}/${cleanPath}`;
+         const cleanVideo = data.mainVideoUrl.replace(/^\/+/, ''); 
+         data.mainVideoUrl = `${baseUrl}/${cleanVideo}`;
       }
       
       if (data.branches) {
         data.branches.forEach(b => {
-           if (b.targetVideoUrl && !b.targetVideoUrl.startsWith('http') && b.targetVideoUrl !== '') {
+           if (b.targetVideoUrl && !b.targetVideoUrl.startsWith('http')) {
              const cleanTarget = b.targetVideoUrl.replace(/^\/+/, '');
              b.targetVideoUrl = `${baseUrl}/${cleanTarget}`;
            }
         });
       }
 
+      // Fallback for ID if still missing
+      if (!data.id && !pathOrId.endsWith('.json')) {
+        data.id = pathOrId;
+      }
+
       return data;
     } catch (error) {
       console.error("[VideoService] Error:", error);
-      throw error; 
+      throw error;
     }
   },
 
-  getFeedIds: async (): Promise<string[]> => {
-    let videos = await FirestoreService.getFeedVideos(10);
-    
-    // --- AUTO SEEDING ---
-    if (videos.length === 0) {
-      console.log("Firestore empty. Seeding initial story data...");
-      await Promise.all(INITIAL_STORY_DATA.map(v => FirestoreService.seedVideoData(v)));
-      videos = await FirestoreService.getFeedVideos(10);
-    }
-
-    // Filter to only show top-level feed items (e.g. ones starting with 'feed_')
-    return videos.filter(v => v.id?.startsWith('feed_')).map(v => v.id!);
-  },
-
-  // Legacy compatibility
   getFeedPaths: async (): Promise<string[]> => {
-    return VideoService.getFeedIds();
+    return Promise.resolve(['feed_1.json', 'feed_2.json']);
   },
 
   getTopVideos: async (): Promise<VideoData[]> => {
-    return await FirestoreService.getGlobalTopVideos(7);
+    let videos = await FirestoreService.getGlobalTopVideos(7);
+
+    if (videos.length === 0) {
+      console.log("Seeding Firestore...");
+      const promises = MOCK_DB_SEED.map(v => 
+        FirestoreService.seedVideoData({
+          id: v.id,
+          title: v.title,
+          thumbnailUrl: v.thumbnailUrl,
+          mainVideoUrl: '', 
+          branches: [],
+          likes: v.likes,
+          uploaderId: v.uploaderId,
+          jsonName: v.jsonName
+        }, v.numericViews, v.daysAgo)
+      );
+      await Promise.all(promises);
+      videos = await FirestoreService.getGlobalTopVideos(7);
+    }
+
+    return videos;
   },
 
   getNewVideos: async (): Promise<VideoData[]> => {
-    return await FirestoreService.getGlobalNewVideos(7);
+    let videos = await FirestoreService.getGlobalNewVideos(7);
+    if (videos.length === 0) {
+      await VideoService.getTopVideos();
+      videos = await FirestoreService.getGlobalNewVideos(7);
+    }
+    return videos;
   },
 
   getMostLovedVideos: async (): Promise<VideoData[]> => {
@@ -160,28 +186,33 @@ export const VideoService = {
 
   getUserProfile: async (username: string): Promise<UserProfile> => {
     const targetUsername = username.replace('@', '');
-    const feedIds = await VideoService.getFeedIds();
+    const feedPaths = await VideoService.getFeedPaths();
     const matchedVideos: VideoData[] = [];
 
-    for (const id of feedIds) {
+    for (const path of feedPaths) {
       try {
-        const video = await VideoService.fetchVideoData(id);
+        const video = await VideoService.fetchVideoData(path);
         if (video.uploaderId === targetUsername) {
-          matchedVideos.push(video);
+          const videoForGrid = {
+            ...video,
+            id: video.id || path,
+            views: video.views || (Math.floor(Math.random() * 900) + 100 + 'K') 
+          };
+          matchedVideos.push(videoForGrid);
         }
       } catch (err) {}
     }
 
-    return Promise.resolve({
+    return {
       id: `user_${targetUsername}`,
       username: targetUsername,
       avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${targetUsername}`,
       followers: '1.9K',
       likes: '46K',
-      bio: 'Interactive Storyteller',
+      bio: 'NEVER LOSE HOPE',
       additionalInfo: '',
       videos: matchedVideos
-    });
+    };
   },
 
   searchChannels: async (query: string): Promise<Partial<UserProfile>[]> => {
@@ -189,10 +220,11 @@ export const VideoService = {
       { id: '1', username: 'narrative_explorer', followers: '1.9K' },
       { id: '2', username: 'scifi_fan', followers: '12K' },
     ];
-    return Promise.resolve(channels.filter(c => c.username.toLowerCase().includes(query.toLowerCase())));
+    return channels.filter(c => c.username.toLowerCase().includes(query.toLowerCase()));
   },
 
-  uploadVideo: async (data: VideoData): Promise<void> => {
-     await FirestoreService.saveVideoMetadata(data);
+  uploadVideo: async (data: any): Promise<void> => {
+     console.log("Mock Upload:", data);
+     return Promise.resolve();
   }
 };

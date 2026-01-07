@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { VideoService } from '../services/mockData';
@@ -117,6 +118,7 @@ export const Channel: React.FC = () => {
             <div 
               key={video.id} 
               className="aspect-[3/4] relative bg-gray-100 cursor-pointer overflow-hidden group"
+              onClick={() => navigate(`/explore/${video.id}`)}
             >
               <img 
                 src={video.thumbnailUrl} 

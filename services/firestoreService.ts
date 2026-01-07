@@ -1,6 +1,18 @@
 import { db } from './firebaseConfig';
-// Import firebase for FieldValue access
-import firebase from 'firebase/app';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  increment, 
+  deleteDoc, 
+  serverTimestamp, 
+  collection, 
+  getDocs, 
+  query, 
+  orderBy, 
+  limit,
+  Timestamp
+} from '@firebase/firestore';
 import { VideoData } from '../types';
 
 // Helper to format numbers (e.g. 1200 -> 1.2K)
@@ -15,101 +27,49 @@ const formatViews = (num: number): string => {
 };
 
 export const FirestoreService = {
-  // Fetch a single video by its Firestore Document ID using namespaced API
-  getVideoById: async (id: string): Promise<VideoData | null> => {
+  // Get a single video document by ID
+  getVideoById: async (id: string): Promise<any | null> => {
     try {
-      const docRef = db.collection('videos').doc(id);
-      const docSnap = await docRef.get();
-      
-      if (docSnap.exists) {
-        const data = docSnap.data();
-        if (!data) return null;
-        return {
-          id: docSnap.id,
-          ...data,
-          views: formatViews(data.viewsCount || 0),
-        } as VideoData;
+      const docRef = doc(db, 'videos', id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return { id: docSnap.id, ...docSnap.data() };
       }
       return null;
-    } catch (error) {
-      console.error("Error fetching video by ID:", error);
-      throw error;
-    }
-  },
-
-  // Get initial feed of videos using namespaced API
-  getFeedVideos: async (limitCount: number = 10): Promise<VideoData[]> => {
-    try {
-      const snapshot = await db.collection('videos')
-        .orderBy('createdAt', 'desc')
-        .limit(limitCount)
-        .get();
-      
-      return snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          views: formatViews(data.viewsCount || 0),
-        } as VideoData;
-      });
     } catch (e) {
-      console.error("Error fetching feed:", e);
-      return [];
+      console.error("Error fetching video by ID:", e);
+      return null;
     }
   },
 
-  // Create or Update a video document using namespaced API
-  saveVideoMetadata: async (videoData: VideoData): Promise<string> => {
-    try {
-      const dataToSave = {
-        ...videoData,
-        viewsCount: videoData.viewsCount || 0,
-        createdAt: videoData.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
-        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-      };
-
-      if (videoData.id) {
-        await db.collection('videos').doc(videoData.id).set(dataToSave, { merge: true });
-        return videoData.id;
-      } else {
-        const docRef = await db.collection('videos').add(dataToSave);
-        return docRef.id;
-      }
-    } catch (e) {
-      console.error("Error saving video:", e);
-      throw e;
-    }
-  },
-
-  // Increment view count atomically using namespaced API
+  // Increment view count atomically
   incrementView: async (videoId: string) => {
     if (!videoId) return;
-    const videoRef = db.collection('videos').doc(videoId);
+    const videoRef = doc(db, 'videos', videoId);
     try {
-      await videoRef.set({ 
-        viewsCount: firebase.firestore.FieldValue.increment(1),
-        lastUpdated: firebase.firestore.FieldValue.serverTimestamp() 
+      await setDoc(videoRef, { 
+        viewsCount: increment(1),
+        lastUpdated: serverTimestamp() 
       }, { merge: true });
     } catch (e) {
-      // Quiet fail for analytics
+      console.error("Error incrementing view:", e);
     }
   },
 
   toggleLike: async (userId: string, video: VideoData, isLiked: boolean) => {
     if (!video.id || !userId) return;
-    const userLikeRef = db.collection('users').doc(userId).collection('likedVideos').doc(video.id);
+    const userLikeRef = doc(db, 'users', userId, 'likedVideos', video.id);
 
     try {
       if (isLiked) {
-        await userLikeRef.delete();
+        await deleteDoc(userLikeRef);
       } else {
-        await userLikeRef.set({
+        await setDoc(userLikeRef, {
           videoId: video.id,
           thumbnailUrl: video.thumbnailUrl || '',
           title: video.title || '',
-          likedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          views: video.views || '0' 
+          likedAt: serverTimestamp(),
+          views: '0' 
         });
       }
     } catch (e) {
@@ -120,10 +80,10 @@ export const FirestoreService = {
 
   checkIfLiked: async (userId: string, videoId: string): Promise<boolean> => {
     if (!userId || !videoId) return false;
-    const docRef = db.collection('users').doc(userId).collection('likedVideos').doc(videoId);
+    const docRef = doc(db, 'users', userId, 'likedVideos', videoId);
     try {
-      const docSnap = await docRef.get();
-      return docSnap.exists;
+      const docSnap = await getDoc(docRef);
+      return docSnap.exists();
     } catch (e) {
       return false;
     }
@@ -132,11 +92,11 @@ export const FirestoreService = {
   getUserLikedVideos: async (userId: string): Promise<VideoData[]> => {
     if (!userId) return [];
     try {
-      const snapshot = await db.collection('users').doc(userId).collection('likedVideos')
-        .orderBy('likedAt', 'desc')
-        .get();
+      const likesRef = collection(db, 'users', userId, 'likedVideos');
+      const q = query(likesRef, orderBy('likedAt', 'desc'));
+      const querySnapshot = await getDocs(q);
       
-      return snapshot.docs.map(doc => {
+      return querySnapshot.docs.map(doc => {
           const data = doc.data();
           return {
               id: data.videoId,
@@ -144,7 +104,7 @@ export const FirestoreService = {
               thumbnailUrl: data.thumbnailUrl,
               title: data.title,
               branches: [],
-              views: data.views || '0', 
+              views: '0', 
               likes: 0
           } as VideoData;
       });
@@ -156,31 +116,73 @@ export const FirestoreService = {
 
   getGlobalTopVideos: async (limitCount: number = 10): Promise<VideoData[]> => {
     try {
-      const snapshot = await db.collection('videos')
-        .orderBy('viewsCount', 'desc')
-        .limit(limitCount)
-        .get();
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), views: formatViews(doc.data().viewsCount || 0) } as VideoData));
-    } catch (e) { return []; }
+      const videosRef = collection(db, 'videos');
+      const q = query(videosRef, orderBy('viewsCount', 'desc'), limit(limitCount));
+      const snapshot = await getDocs(q);
+      
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || 'Untitled',
+          thumbnailUrl: data.thumbnailUrl || '',
+          mainVideoUrl: data.mainVideoUrl || '',
+          views: formatViews(data.viewsCount || 0),
+          likes: data.likes || 0,
+          uploaderId: data.uploaderId || 'unknown',
+          branches: data.branches || [],
+          jsonName: data.jsonName || ''
+        } as VideoData;
+      });
+    } catch (e) {
+      console.error("Error fetching top videos:", e);
+      return [];
+    }
   },
 
   getGlobalNewVideos: async (limitCount: number = 10): Promise<VideoData[]> => {
     try {
-      const snapshot = await db.collection('videos')
-        .orderBy('createdAt', 'desc')
-        .limit(limitCount)
-        .get();
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), views: formatViews(doc.data().viewsCount || 0) } as VideoData));
-    } catch (e) { return []; }
+      const videosRef = collection(db, 'videos');
+      const q = query(videosRef, orderBy('createdAt', 'desc'), limit(limitCount));
+      const snapshot = await getDocs(q);
+      
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || 'Untitled',
+          thumbnailUrl: data.thumbnailUrl || '',
+          mainVideoUrl: data.mainVideoUrl || '', 
+          views: formatViews(data.viewsCount || 0),
+          likes: data.likes || 0,
+          uploaderId: data.uploaderId || 'unknown',
+          branches: data.branches || [],
+          jsonName: data.jsonName || ''
+        } as VideoData;
+      });
+    } catch (e) {
+      console.error("Error fetching new videos:", e);
+      return [];
+    }
   },
 
-  // Seeding helper using namespaced API
-  seedVideoData: async (video: VideoData) => {
+  seedVideoData: async (video: VideoData, numericViews: number, daysAgo: number) => {
     if (!video.id) return;
-    await db.collection('videos').doc(video.id).set({
-      ...video,
-      viewsCount: video.viewsCount || 0,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    const videoRef = doc(db, 'videos', video.id);
+    
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+
+    await setDoc(videoRef, {
+      title: video.title,
+      thumbnailUrl: video.thumbnailUrl,
+      mainVideoUrl: video.mainVideoUrl,
+      uploaderId: video.uploaderId,
+      viewsCount: numericViews,
+      likes: video.likes,
+      branches: video.branches || [],
+      createdAt: Timestamp.fromDate(date),
+      jsonName: video.jsonName || ''
     }, { merge: true });
   }
 };
