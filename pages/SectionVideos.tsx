@@ -30,8 +30,8 @@ export const SectionVideos: React.FC = () => {
            data = await VideoService.getMostLovedVideos();
         }
         
-        // Duplicate data to fill the grid for demo purposes
-        setVideos([...data, ...data, ...data]);
+        // Show only actual unique videos returned by the service
+        setVideos(data);
       } catch (e) {
         console.error(e);
       } finally {
@@ -82,6 +82,9 @@ export const SectionVideos: React.FC = () => {
                </div>
              ))}
            </div>
+         )}
+         {!loading && videos.length === 0 && (
+           <div className="text-center py-20 text-gray-400">No videos available.</div>
          )}
       </div>
     </div>

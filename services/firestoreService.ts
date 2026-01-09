@@ -1,3 +1,4 @@
+
 import { db } from './firebaseConfig';
 import { 
   doc, 
@@ -9,11 +10,12 @@ import {
   collection, 
   getDocs, 
   query, 
+  where,
   orderBy, 
   limit,
   Timestamp
 } from '@firebase/firestore';
-import { VideoData } from '../types';
+import { VideoData, UserProfile } from '../types';
 
 // Helper to format numbers (e.g. 1200 -> 1.2K)
 const formatViews = (num: number): string => {
@@ -27,7 +29,7 @@ const formatViews = (num: number): string => {
 };
 
 export const FirestoreService = {
-  // Get a single video document by ID
+  // --- Video Methods ---
   getVideoById: async (id: string): Promise<any | null> => {
     try {
       const docRef = doc(db, 'videos', id);
@@ -36,26 +38,51 @@ export const FirestoreService = {
         return { id: docSnap.id, ...docSnap.data() };
       }
       return null;
-    } catch (e) {
-      console.error("Error fetching video by ID:", e);
+    } catch (e: any) {
+      console.warn("Firestore [getVideoById] error:", e.message);
       return null;
     }
   },
 
-  // Increment view count atomically
   incrementView: async (videoId: string) => {
     if (!videoId) return;
-    const videoRef = doc(db, 'videos', videoId);
     try {
+      const videoRef = doc(db, 'videos', videoId);
       await setDoc(videoRef, { 
         viewsCount: increment(1),
         lastUpdated: serverTimestamp() 
       }, { merge: true });
-    } catch (e) {
-      console.error("Error incrementing view:", e);
+    } catch (e: any) {
+      console.warn("Firestore [incrementView] error:", e.message);
     }
   },
 
+  getVideosByUploader: async (uploaderId: string): Promise<VideoData[]> => {
+    try {
+      const videosRef = collection(db, 'videos');
+      const q = query(videosRef, where('uploaderId', '==', uploaderId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || 'Untitled',
+          thumbnailUrl: data.thumbnailUrl || '',
+          mainVideoUrl: data.mainVideoUrl || '',
+          views: formatViews(data.viewsCount || 0),
+          likes: data.likes || 0,
+          uploaderId: data.uploaderId,
+          branches: data.branches || [],
+          jsonName: data.jsonName || ''
+        } as VideoData;
+      });
+    } catch (e: any) {
+      console.warn("Firestore [getVideosByUploader] error:", e.message);
+      return [];
+    }
+  },
+
+  // --- Like Methods ---
   toggleLike: async (userId: string, video: VideoData, isLiked: boolean) => {
     if (!video.id || !userId) return;
     const userLikeRef = doc(db, 'users', userId, 'likedVideos', video.id);
@@ -72,8 +99,8 @@ export const FirestoreService = {
           views: '0' 
         });
       }
-    } catch (e) {
-      console.error("Error toggling like:", e);
+    } catch (e: any) {
+      console.error("Firestore [toggleLike] error:", e.message);
       throw e;
     }
   },
@@ -108,12 +135,53 @@ export const FirestoreService = {
               likes: 0
           } as VideoData;
       });
-    } catch (e) {
-      console.error("Error fetching liked videos:", e);
+    } catch (e: any) {
+      console.warn("Firestore [getUserLikedVideos] error:", e.message);
       return [];
     }
   },
 
+  // --- Channel Methods ---
+  getGlobalChannels: async (limitCount: number = 20): Promise<Partial<UserProfile>[]> => {
+    try {
+      const channelsRef = collection(db, 'channels');
+      const q = query(channelsRef, limit(limitCount));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          username: data.username,
+          avatarUrl: data.avatarUrl,
+          followers: data.followers || '0',
+          likes: data.likes || '0',
+          bio: data.bio || ''
+        };
+      });
+    } catch (e: any) {
+      console.warn("Firestore [getGlobalChannels] error:", e.message);
+      return [];
+    }
+  },
+
+  getChannelByUsername: async (username: string): Promise<Partial<UserProfile> | null> => {
+    try {
+      const cleanUsername = username.replace('@', '');
+      const channelsRef = collection(db, 'channels');
+      const q = query(channelsRef, where('username', '==', cleanUsername), limit(1));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        return { id: doc.id, ...doc.data() } as Partial<UserProfile>;
+      }
+      return null;
+    } catch (e: any) {
+      console.warn("Firestore [getChannelByUsername] error:", e.message);
+      return null;
+    }
+  },
+
+  // --- Seeding Methods ---
   getGlobalTopVideos: async (limitCount: number = 10): Promise<VideoData[]> => {
     try {
       const videosRef = collection(db, 'videos');
@@ -134,8 +202,7 @@ export const FirestoreService = {
           jsonName: data.jsonName || ''
         } as VideoData;
       });
-    } catch (e) {
-      console.error("Error fetching top videos:", e);
+    } catch (e: any) {
       return [];
     }
   },
@@ -160,29 +227,48 @@ export const FirestoreService = {
           jsonName: data.jsonName || ''
         } as VideoData;
       });
-    } catch (e) {
-      console.error("Error fetching new videos:", e);
+    } catch (e: any) {
       return [];
     }
   },
 
-  seedVideoData: async (video: VideoData, numericViews: number, daysAgo: number) => {
-    if (!video.id) return;
-    const videoRef = doc(db, 'videos', video.id);
-    
-    const date = new Date();
-    date.setDate(date.getDate() - daysAgo);
+  seedChannelData: async (channel: any) => {
+    try {
+      const channelId = channel.username.replace(/\s+/g, '_').toLowerCase();
+      const channelRef = doc(db, 'channels', channelId);
+      await setDoc(channelRef, {
+        username: channel.username,
+        followers: channel.followers,
+        likes: channel.likes,
+        bio: channel.bio,
+        avatarUrl: channel.avatarUrl,
+        createdAt: serverTimestamp()
+      }, { merge: true });
+    } catch (e: any) {
+      console.warn("Firestore [seedChannelData] error:", e.message);
+    }
+  },
 
-    await setDoc(videoRef, {
-      title: video.title,
-      thumbnailUrl: video.thumbnailUrl,
-      mainVideoUrl: video.mainVideoUrl,
-      uploaderId: video.uploaderId,
-      viewsCount: numericViews,
-      likes: video.likes,
-      branches: video.branches || [],
-      createdAt: Timestamp.fromDate(date),
-      jsonName: video.jsonName || ''
-    }, { merge: true });
+  seedVideoData: async (video: VideoData, numericViews: number, daysAgo: number) => {
+    try {
+      if (!video.id) return;
+      const videoRef = doc(db, 'videos', video.id);
+      const date = new Date();
+      date.setDate(date.getDate() - daysAgo);
+
+      await setDoc(videoRef, {
+        title: video.title,
+        thumbnailUrl: video.thumbnailUrl,
+        mainVideoUrl: video.mainVideoUrl,
+        uploaderId: video.uploaderId,
+        viewsCount: numericViews,
+        likes: video.likes,
+        branches: video.branches || [],
+        createdAt: Timestamp.fromDate(date),
+        jsonName: video.jsonName || ''
+      }, { merge: true });
+    } catch (e: any) {
+      console.warn("Firestore [seedVideoData] error:", e.message);
+    }
   }
 };

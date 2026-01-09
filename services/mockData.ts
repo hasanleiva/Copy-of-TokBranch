@@ -23,7 +23,7 @@ const MOCK_DB_SEED = [
     likes: 1200000,
     numericViews: 1500000,
     thumbnailUrl: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&q=80&w=800',
-    uploaderId: 'vogue_style',
+    uploaderId: 'fashionista',
     daysAgo: 12,
     jsonName: 'feed_2.json'
   },
@@ -33,7 +33,7 @@ const MOCK_DB_SEED = [
     likes: 2300,
     numericViews: 5400,
     thumbnailUrl: 'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&q=80&w=800',
-    uploaderId: 'travel_bug',
+    uploaderId: 'guy_hawkins',
     daysAgo: 0,
     jsonName: 'feed_1.json'
   },
@@ -43,30 +43,16 @@ const MOCK_DB_SEED = [
     likes: 1200,
     numericViews: 3200,
     thumbnailUrl: 'https://images.unsplash.com/photo-1520045864906-820551b7142d?auto=format&fit=crop&q=80&w=800',
-    uploaderId: 'skater_boy',
+    uploaderId: 'guy_hawkins',
     daysAgo: 1,
     jsonName: 'feed_2.json'
-  },
-  {
-    id: 'top1',
-    title: 'My Morning Routine',
-    likes: 980000,
-    numericViews: 1200000,
-    thumbnailUrl: 'https://images.unsplash.com/photo-1535295972055-1c762f4483e5?auto=format&fit=crop&q=80&w=800',
-    uploaderId: 'lifestyle_guru',
-    daysAgo: 15,
-    jsonName: 'feed_1.json'
-  },
-  {
-    id: 'top2',
-    title: 'Extreme Fitness',
-    likes: 850000,
-    numericViews: 980000,
-    thumbnailUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=800',
-    uploaderId: 'fit_pro',
-    daysAgo: 8,
-    jsonName: 'feed_2.json'
   }
+];
+
+const MOCK_CHANNEL_SEED = [
+  { username: 'inspirer', followers: '1.9M', likes: '46K', bio: 'NEVER LOSE HOPE', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jenny' },
+  { username: 'fashionista', followers: '500K', likes: '12K', bio: 'Creating lifestyle vibes', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lisa' },
+  { username: 'guy_hawkins', followers: '2.1M', likes: '102K', bio: 'Skate and Travel', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Guy' },
 ];
 
 // Shuffle helper
@@ -85,84 +71,70 @@ export const VideoService = {
     let jsonFilename = pathOrId;
     let explicitId: string | null = null;
 
-    // Resolve Firestore ID to JSON filename
+    // 1. Resolve ID to filename via Firestore if it's not a path
     if (!pathOrId.endsWith('.json')) {
       const doc = await FirestoreService.getVideoById(pathOrId);
       if (doc && doc.jsonName) {
         jsonFilename = doc.jsonName;
         explicitId = pathOrId;
       } else {
-        throw new Error(`Video ID ${pathOrId} not found in Firestore metadata.`);
+        // If firestore fails, check if ID might be a local filename
+        jsonFilename = pathOrId.includes('.') ? pathOrId : `${pathOrId}.json`;
       }
     }
 
     const cleanFilename = jsonFilename.split('/').pop()?.replace(/^\/+/, '') || '';
-    const fetchUrl = `${baseUrl}/${cleanFilename}`;
+    const fetchUrls = [
+      `${baseUrl}/${cleanFilename}`,         // Try CDN
+      `./data/${cleanFilename}`,            // Try Local Data Folder
+      `/data/${cleanFilename}`              // Try Absolute Local
+    ];
 
-    try {
-      const response = await fetch(fetchUrl);
-      if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-      
-      const data: VideoData = await response.json();
-
-      // Enforce the Firestore document ID to prevent 'feed_1' duplicates
-      if (explicitId) {
-        data.id = explicitId;
+    let lastError = null;
+    for (const url of fetchUrls) {
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          const data: VideoData = await response.json();
+          if (explicitId) data.id = explicitId;
+          
+          // Fix relative URLs for assets
+          if (data.mainVideoUrl && !data.mainVideoUrl.startsWith('http')) {
+             data.mainVideoUrl = `${baseUrl}/${data.mainVideoUrl.replace(/^\/+/, '')}`;
+          }
+          if (data.branches) {
+            data.branches.forEach(b => {
+              if (b.targetVideoUrl && !b.targetVideoUrl.startsWith('http')) {
+                b.targetVideoUrl = `${baseUrl}/${b.targetVideoUrl.replace(/^\/+/, '')}`;
+              }
+            });
+          }
+          if (!data.id) data.id = pathOrId;
+          return data;
+        }
+      } catch (e) {
+        lastError = e;
       }
-
-      // Resolve relative URLs to CDN
-      if (data.mainVideoUrl && !data.mainVideoUrl.startsWith('http')) {
-         data.mainVideoUrl = `${baseUrl}/${data.mainVideoUrl.replace(/^\/+/, '')}`;
-      }
-      
-      if (data.branches) {
-        data.branches.forEach(b => {
-           if (b.targetVideoUrl && !b.targetVideoUrl.startsWith('http')) {
-             b.targetVideoUrl = `${baseUrl}/${b.targetVideoUrl.replace(/^\/+/, '')}`;
-           }
-        });
-      }
-
-      if (!data.id && !pathOrId.endsWith('.json')) {
-        data.id = pathOrId;
-      }
-
-      return data;
-    } catch (error) {
-      console.error("[VideoService] Error:", error);
-      throw error;
     }
+
+    throw new Error(lastError ? String(lastError) : `Failed to fetch video config from any source: ${cleanFilename}`);
   },
 
-  /**
-   * Fetches all available video IDs from Firestore and shuffles them for the feed.
-   */
   getFeedPaths: async (): Promise<string[]> => {
     try {
-      // Fetch some top and new videos to build a pool
       const top = await VideoService.getTopVideos();
       const news = await VideoService.getNewVideos();
-      
-      // Combine and get unique IDs
-      const allIds = Array.from(new Set([
-        ...top.map(v => v.id!),
-        ...news.map(v => v.id!)
-      ]));
-
-      // Fallback if DB is empty
+      const allIds = Array.from(new Set([...top.map(v => v.id!), ...news.map(v => v.id!)]));
       if (allIds.length === 0) return ['feed_1.json', 'feed_2.json'];
-
-      // Return a randomized list of IDs
       return shuffleArray(allIds);
     } catch (e) {
-      console.error("Failed to build randomized feed:", e);
       return ['feed_1.json', 'feed_2.json'];
     }
   },
 
   getTopVideos: async (): Promise<VideoData[]> => {
     let videos = await FirestoreService.getGlobalTopVideos(10);
-
+    // Seed if empty OR if firestore returned nothing due to initial setup
     if (videos.length === 0) {
       const promises = MOCK_DB_SEED.map(v => 
         FirestoreService.seedVideoData({
@@ -179,7 +151,6 @@ export const VideoService = {
       await Promise.all(promises);
       videos = await FirestoreService.getGlobalTopVideos(10);
     }
-
     return videos;
   },
 
@@ -197,30 +168,43 @@ export const VideoService = {
   },
 
   getChannels: async (): Promise<Partial<UserProfile>[]> => {
-    return [
-      { id: '1', username: 'Jenny Wilson', followers: '1.9M', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jenny' },
-      { id: '2', username: 'Lisa Alenaes', followers: '500K', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lisa' },
-      { id: '3', username: 'Guy Hawkins', followers: '2.1M', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Guy' },
-    ];
+    let channels = await FirestoreService.getGlobalChannels(10);
+    if (channels.length === 0) {
+      console.log("Seeding channels...");
+      const promises = MOCK_CHANNEL_SEED.map(c => FirestoreService.seedChannelData(c));
+      await Promise.all(promises);
+      channels = await FirestoreService.getGlobalChannels(10);
+    }
+    return channels;
   },
 
   getUserProfile: async (username: string): Promise<UserProfile> => {
-    const targetUsername = username.replace('@', '');
-    const top = await VideoService.getTopVideos();
-    const news = await VideoService.getNewVideos();
-    const all = [...top, ...news];
+    const cleanUsername = username.replace('@', '');
+    const channelData = await FirestoreService.getChannelByUsername(cleanUsername);
+    const videos = await FirestoreService.getVideosByUploader(cleanUsername);
 
-    const matchedVideos = all.filter(v => v.uploaderId === targetUsername);
+    if (!channelData) {
+        return {
+            id: `gen_${cleanUsername}`,
+            username: cleanUsername,
+            avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanUsername}`,
+            followers: '0',
+            likes: '0',
+            bio: 'No bio available.',
+            additionalInfo: '',
+            videos: []
+        };
+    }
 
     return {
-      id: `user_${targetUsername}`,
-      username: targetUsername,
-      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${targetUsername}`,
-      followers: (Math.floor(Math.random() * 50) + 1) + 'K',
-      likes: (Math.floor(Math.random() * 500) + 1) + 'K',
-      bio: 'Creating interactive stories for everyone.',
+      id: channelData.id!,
+      username: channelData.username!,
+      avatarUrl: channelData.avatarUrl!,
+      followers: channelData.followers!,
+      likes: channelData.likes!,
+      bio: channelData.bio!,
       additionalInfo: '',
-      videos: matchedVideos
+      videos: videos
     };
   },
 

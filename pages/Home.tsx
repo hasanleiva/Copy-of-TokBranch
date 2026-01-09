@@ -164,7 +164,6 @@ export const Home: React.FC = () => {
                     </div>
                   </div>
                   <h3 className="text-xs font-bold truncate leading-tight text-gray-900">{video.title}</h3>
-                  <p className="text-[10px] text-gray-500 mt-0.5 truncate">How Successful People...</p>
                 </div>
               ))}
             </div>
@@ -192,7 +191,6 @@ export const Home: React.FC = () => {
                     </div>
                   </div>
                   <h3 className="text-xs font-bold truncate leading-tight text-gray-900">{video.title}</h3>
-                  <p className="text-[10px] text-gray-500 mt-0.5 truncate">Fresh content</p>
                 </div>
               ))}
             </div>
