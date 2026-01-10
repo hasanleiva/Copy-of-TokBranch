@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { VideoPlayer } from './VideoPlayer';
@@ -5,7 +6,7 @@ import { VideoData, Branch } from '../types';
 import { VideoService } from '../services/mockData';
 import { FirestoreService } from '../services/firestoreService';
 import { useAuth } from '../services/authContext';
-import { Star, Share2, Loader2, Plus, AlertCircle, RefreshCcw } from 'lucide-react';
+import { Star, Share2, Loader2, AlertCircle, RefreshCcw, Check } from 'lucide-react';
 import { useElementOnScreen } from '../hooks/useIntersectionObserver';
 
 interface FeedItemProps {
@@ -24,6 +25,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
   const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   
   // Real-time stats
   const [isLiked, setIsLiked] = useState(false);
@@ -79,7 +81,6 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
       setVideoData(nextData);
     } catch (e: any) {
       console.error("Error loading branch json:", e);
-      // Optional: Show toast error here instead of full screen error
       alert("Could not load next video segment: " + e.message);
     } finally {
       setLoading(false);
@@ -102,6 +103,36 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
     } catch (e) {
       // Revert on error
       setIsLiked(prevLiked);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!videoData) return;
+    
+    // Construct share URL
+    const shareUrl = `${window.location.origin}/#/explore/${videoData.id || jsonPath}`;
+    const shareText = `Check out this interactive story: ${videoData.title}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: videoData.title,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.error("Error sharing:", err);
+      }
+    } else {
+      // Fallback to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error("Clipboard error:", err);
+        alert("Link: " + shareUrl);
+      }
     }
   };
 
@@ -152,18 +183,6 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
 
       {/* UI Overlay - Side Actions */}
       <div className="absolute right-2 bottom-28 flex flex-col items-center gap-5 z-20">
-        <div className="relative mb-2">
-          <div 
-            onClick={goToChannel}
-            className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center border-2 border-white cursor-pointer active:scale-90 transition-transform overflow-hidden"
-          >
-             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${videoData.uploaderId || 'user'}`} alt="avatar" className="w-full h-full object-cover" />
-          </div>
-          <button className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-[#fe2c55] text-white rounded-full p-0.5 border border-white">
-            <Plus size={12} strokeWidth={4} />
-          </button>
-        </div>
-
         <div className="flex flex-col items-center">
           <button 
             onClick={handleLike}
@@ -176,14 +195,20 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
               className={isLiked ? "text-[#fe2c55]" : ""} 
             />
           </button>
-          {/* Like count removed */}
         </div>
 
         <div className="flex flex-col items-center">
-          <button className="p-1 text-white drop-shadow-lg active:scale-90 transition-transform">
-            <Share2 size={36} strokeWidth={1.5} />
+          <button 
+            onClick={handleShare}
+            className="p-1 text-white drop-shadow-lg active:scale-90 transition-all flex flex-col items-center gap-1"
+          >
+            <div className={`p-2 rounded-full transition-colors ${copied ? 'bg-green-500' : 'bg-transparent'}`}>
+              {copied ? <Check size={36} strokeWidth={1.5} /> : <Share2 size={36} strokeWidth={1.5} />}
+            </div>
+            <span className="text-xs font-semibold text-white drop-shadow-md">
+              {copied ? 'Copied' : 'Share'}
+            </span>
           </button>
-          <span className="text-xs font-semibold mt-1 text-white">Share</span>
         </div>
       </div>
 

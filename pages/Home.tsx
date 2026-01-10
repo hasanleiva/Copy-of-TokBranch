@@ -127,7 +127,12 @@ export const Home: React.FC = () => {
           <div className="mt-2 mb-2">
             <div className="flex items-center justify-between px-4 mb-2">
               <h2 className="text-base font-bold text-black">Channels to Follow</h2>
-              <button className="text-xs text-gray-500 hover:text-black font-medium">View all</button>
+              <button 
+                onClick={() => navigate('/all-channels')}
+                className="text-xs text-gray-500 hover:text-black font-medium"
+              >
+                View all
+              </button>
             </div>
             
             <div className="flex overflow-x-auto px-4 gap-4 no-scrollbar pb-2">

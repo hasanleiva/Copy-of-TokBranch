@@ -13,6 +13,7 @@ import { Discover } from './pages/Discover';
 import { Profile } from './pages/Profile';
 import { MyAccount } from './pages/MyAccount';
 import { Subscriptions } from './pages/Subscriptions';
+import { AllChannels } from './pages/AllChannels';
 import { AuthProvider, useAuth } from './services/authContext';
 import { Home as HomeIcon, Compass, User, Upload, FolderHeart } from 'lucide-react';
 
@@ -84,6 +85,7 @@ export default function App() {
             <Route path="/explore/:startId" element={<Feed />} />
             <Route path="/library" element={<Library />} />
             <Route path="/section/:type" element={<SectionVideos />} />
+            <Route path="/all-channels" element={<AllChannels />} />
             <Route path="/login" element={<Login />} />
             <Route path="/channel/:userId" element={<Channel />} />
             
