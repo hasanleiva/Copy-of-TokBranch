@@ -3,14 +3,13 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { VideoService } from '../services/mockData';
 import { UserProfile } from '../types';
-import { ChevronLeft, MoreHorizontal, ChevronDown, Grid, Heart, Play } from 'lucide-react';
+import { ChevronLeft, MoreHorizontal, Grid, Play } from 'lucide-react';
 
 export const Channel: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'videos' | 'likes'>('videos');
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -31,7 +30,7 @@ export const Channel: React.FC = () => {
   if (loading || !profile) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-white">
-        <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-8 h-8 border-4 border-[#fe2c55] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -43,7 +42,6 @@ export const Channel: React.FC = () => {
         <button onClick={() => navigate(-1)} className="p-1 -ml-1 hover:bg-gray-100 rounded-full transition-colors">
           <ChevronLeft size={28} strokeWidth={1.5} />
         </button>
-        {/* Title hidden initially like native app, could show on scroll */}
         <div className="font-bold text-base opacity-0">{profile.username}</div>
         <button className="p-1 -mr-1 hover:bg-gray-100 rounded-full transition-colors">
           <MoreHorizontal size={24} />
@@ -55,7 +53,7 @@ export const Channel: React.FC = () => {
         <div className="flex flex-col items-center pt-2 pb-4">
           
           {/* Avatar */}
-          <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 mb-3 shrink-0 border border-gray-100">
+          <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 mb-3 shrink-0 border border-gray-100 shadow-sm">
             <img 
               src={profile.avatarUrl} 
               alt={profile.username} 
@@ -64,52 +62,20 @@ export const Channel: React.FC = () => {
           </div>
 
           {/* Username */}
-          <h1 className="text-lg font-bold mb-5">@{profile.username}</h1>
-
-          {/* Stats */}
-          <div className="flex items-center gap-12 mb-6">
-            <div className="flex flex-col items-center">
-              <span className="font-bold text-lg leading-none">{profile.followers}</span>
-              <span className="text-gray-400 text-[11px] font-medium mt-1">FOLLOWERS</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="font-bold text-lg leading-none">{profile.likes}</span>
-              <span className="text-gray-400 text-[11px] font-medium mt-1">LIKES</span>
-            </div>
-          </div>
-
-          {/* Buttons */}
-          <div className="flex items-center gap-2 mb-6 w-full px-12 justify-center">
-            <button className="bg-[#fe2c55] text-white font-bold py-3 px-12 rounded-md text-sm active:scale-95 transition-transform shadow-sm min-w-[160px]">
-              Follow
-            </button>
-            <button className="w-11 h-11 border border-gray-200 rounded-md flex items-center justify-center active:bg-gray-50 transition-colors bg-white">
-              <ChevronDown size={20} className="text-black" />
-            </button>
-          </div>
+          <h1 className="text-lg font-bold mb-4">@{profile.username}</h1>
 
           {/* Bio */}
-          <div className="text-center px-8 mb-2">
+          <div className="text-center px-8 mb-6">
             <p className="font-semibold text-sm uppercase tracking-wide text-gray-900">{profile.bio}</p>
           </div>
         </div>
 
-        {/* Sticky Tabs */}
+        {/* Static Tab indicator (Only Grid) */}
         <div className="sticky top-0 bg-white z-10 flex border-t border-b border-gray-100">
-          <button 
-            onClick={() => setActiveTab('videos')}
-            className={`flex-1 py-3 flex items-center justify-center transition-colors relative ${activeTab === 'videos' ? 'text-black' : 'text-gray-300'}`}
-          >
-            <Grid size={20} strokeWidth={activeTab === 'videos' ? 2.5 : 2} />
-            {activeTab === 'videos' && <div className="absolute bottom-0 w-8 h-0.5 bg-black" />}
-          </button>
-          <button 
-            onClick={() => setActiveTab('likes')}
-            className={`flex-1 py-3 flex items-center justify-center transition-colors relative ${activeTab === 'likes' ? 'text-black' : 'text-gray-300'}`}
-          >
-            <Heart size={20} strokeWidth={activeTab === 'likes' ? 2.5 : 2} />
-             {activeTab === 'likes' && <div className="absolute bottom-0 w-8 h-0.5 bg-black" />}
-          </button>
+          <div className="flex-1 py-3 flex items-center justify-center text-black relative">
+            <Grid size={20} strokeWidth={2.5} />
+            <div className="absolute bottom-0 w-8 h-0.5 bg-black" />
+          </div>
         </div>
 
         {/* Video Grid */}

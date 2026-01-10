@@ -168,14 +168,36 @@ export const VideoService = {
   },
 
   getChannels: async (): Promise<Partial<UserProfile>[]> => {
-    let channels = await FirestoreService.getGlobalChannels(10);
+    let channels = await FirestoreService.getGlobalChannels(50);
     if (channels.length === 0) {
       console.log("Seeding channels...");
       const promises = MOCK_CHANNEL_SEED.map(c => FirestoreService.seedChannelData(c));
       await Promise.all(promises);
-      channels = await FirestoreService.getGlobalChannels(10);
+      channels = await FirestoreService.getGlobalChannels(50);
     }
-    return channels;
+
+    // Attach real video counts
+    try {
+      // Fetch a reasonably large set of videos to calculate counts
+      const topVids = await FirestoreService.getGlobalTopVideos(100);
+      const newVids = await FirestoreService.getGlobalNewVideos(100);
+      const allKnownVids = [...topVids, ...newVids];
+      
+      const counts: Record<string, number> = {};
+      allKnownVids.forEach(v => {
+        if (v.uploaderId) {
+          counts[v.uploaderId] = (counts[v.uploaderId] || 0) + 1;
+        }
+      });
+
+      return channels.map(c => ({
+        ...c,
+        videoCount: counts[c.username || ''] || 0
+      }));
+    } catch (e) {
+      console.error("Error calculating video counts:", e);
+      return channels;
+    }
   },
 
   getUserProfile: async (username: string): Promise<UserProfile> => {
@@ -187,12 +209,13 @@ export const VideoService = {
         return {
             id: `gen_${cleanUsername}`,
             username: cleanUsername,
-            avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanUsername}`,
+            avatarUrl: 'https://my-replaygram.b-cdn.net/avatar.png',
             followers: '0',
             likes: '0',
             bio: 'No bio available.',
             additionalInfo: '',
-            videos: []
+            videos: [],
+            videoCount: 0
         };
     }
 
@@ -204,7 +227,8 @@ export const VideoService = {
       likes: channelData.likes!,
       bio: channelData.bio!,
       additionalInfo: '',
-      videos: videos
+      videos: videos,
+      videoCount: videos.length
     };
   },
 

@@ -50,9 +50,9 @@ export const AllChannels: React.FC = () => {
               <div 
                 key={channel.id}
                 onClick={() => navigate(`/channel/@${channel.username}`)}
-                className="flex items-center gap-4 p-3 bg-gray-50 border border-gray-100 rounded-2xl cursor-pointer active:scale-[0.98] transition-all hover:shadow-sm"
+                className="flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl cursor-pointer active:scale-[0.98] transition-all hover:shadow-md hover:border-gray-200"
               >
-                <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 border border-gray-100 shrink-0">
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100 border border-gray-100 shrink-0">
                   <img 
                     src={channel.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${channel.username}`} 
                     alt={channel.username} 
@@ -60,18 +60,11 @@ export const AllChannels: React.FC = () => {
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm text-black truncate">@{channel.username}</p>
-                  <p className="text-xs text-gray-500">{channel.followers || '0'} followers</p>
+                  <p className="font-bold text-base text-black truncate mb-0.5">@{channel.username}</p>
+                  <p className="text-xs text-gray-400 font-medium">
+                    {channel.videoCount || 0} videos
+                  </p>
                 </div>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Handle follow logic here
-                  }}
-                  className="bg-[#fe2c55] text-white px-5 py-2 rounded-full text-xs font-bold active:scale-95 transition-transform shadow-sm"
-                >
-                  Follow
-                </button>
               </div>
             ))}
             {channels.length === 0 && (

@@ -38,4 +38,5 @@ export interface UserProfile {
   bio: string;
   additionalInfo: string;
   videos: VideoData[];
+  videoCount?: number;
 }
