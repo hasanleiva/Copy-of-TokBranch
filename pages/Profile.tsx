@@ -132,10 +132,10 @@ export const Profile: React.FC = () => {
               <div className="w-16 h-16 bg-pink-50 text-[#fe2c55] rounded-2xl flex items-center justify-center mb-6 shadow-inner">
                 <Heart size={32} fill="currentColor" />
               </div>
-              <h2 className="text-2xl font-black mb-4 tracking-tight text-gray-900">About TokBranch</h2>
+              <h2 className="text-2xl font-black mb-4 tracking-tight text-gray-900">About Replaygram</h2>
               <div className="space-y-4 text-gray-600 text-sm leading-relaxed">
                 <p>
-                  TokBranch is a next-generation interactive video platform designed for storytelling that puts you in the driver's seat. 
+                  Replaygram is a next-generation interactive video platform designed for storytelling that puts you in the driver's seat. 
                 </p>
                 <p>
                   Explore immersive branching narratives where every choice matters. Whether you're exploring mysterious forests or urban landscapes, the story evolves based on your interactions.

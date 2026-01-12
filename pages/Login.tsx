@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '../services/authContext';
 import { useNavigate } from 'react-router';
-import { Eye, EyeOff, Mail, Lock, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ArrowLeft, CheckCircle, RefreshCcw } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { loginWithEmail, signupWithEmail, resetPassword } = useAuth();
@@ -173,9 +174,12 @@ export const Login: React.FC = () => {
         
         {/* Logo & Title */}
         <div className="flex flex-col items-center mb-8">
-           <div className="bg-[#fe2c55] p-3 rounded-2xl rotate-3 shadow-lg mb-6">
+           <div className="bg-[#fe2c55] p-3 rounded-2xl rotate-3 shadow-lg mb-6 relative group">
+              <div className="absolute -top-1 -right-1 bg-white rounded-full p-1 shadow-sm group-hover:rotate-180 transition-transform duration-500">
+                <RefreshCcw size={14} className="text-[#fe2c55]" />
+              </div>
               <h1 className="text-3xl font-black text-white italic">
-                TB
+                RG
               </h1>
            </div>
            <h1 className="text-2xl font-black text-center mb-2 tracking-tight">
@@ -183,8 +187,8 @@ export const Login: React.FC = () => {
            </h1>
            <p className="text-center text-gray-400 text-sm">
              {isLoginMode 
-               ? 'Log in to continue your TokBranch journey.' 
-               : 'Join TokBranch to start your interactive story.'}
+               ? 'Log in to continue your Replaygram journey.' 
+               : 'Join Replaygram to start your interactive story.'}
            </p>
         </div>
 
@@ -246,6 +250,16 @@ export const Login: React.FC = () => {
               >
                 Forgot Password?
               </button>
+            </div>
+          )}
+
+          {/* Terms and Conditions (Signup Mode Only) */}
+          {!isLoginMode && (
+            <div className="text-[11px] text-gray-400 text-center leading-normal px-2 py-1">
+              By registering, you accept our{' '}
+              <a href="#" className="underline font-semibold hover:text-black transition-colors">Terms and Conditions</a>,{' '}
+              <a href="#" className="underline font-semibold hover:text-black transition-colors">Privacy Policy</a> and{' '}
+              <a href="#" className="underline font-semibold hover:text-black transition-colors">Cookie Policy</a>.
             </div>
           )}
 
