@@ -181,19 +181,32 @@ export const VideoService = {
       // Fetch a reasonably large set of videos to calculate counts
       const topVids = await FirestoreService.getGlobalTopVideos(100);
       const newVids = await FirestoreService.getGlobalNewVideos(100);
-      const allKnownVids = [...topVids, ...newVids];
+      
+      // FIX: Deduplicate videos by ID to ensure accurate counts
+      const uniqueVidsMap = new Map<string, VideoData>();
+      [...topVids, ...newVids].forEach(v => {
+        if (v.id) {
+          uniqueVidsMap.set(v.id, v);
+        }
+      });
       
       const counts: Record<string, number> = {};
-      allKnownVids.forEach(v => {
+      uniqueVidsMap.forEach(v => {
         if (v.uploaderId) {
-          counts[v.uploaderId] = (counts[v.uploaderId] || 0) + 1;
+          // Normalize uploader ID: lowercase, trim, and remove '@' prefix
+          const normalizedUploader = v.uploaderId.toLowerCase().replace(/^@/, '').trim();
+          counts[normalizedUploader] = (counts[normalizedUploader] || 0) + 1;
         }
       });
 
-      return channels.map(c => ({
-        ...c,
-        videoCount: counts[c.username || ''] || 0
-      }));
+      return channels.map(c => {
+        // Normalize channel username for matching
+        const normalizedUsername = (c.username || '').toLowerCase().replace(/^@/, '').trim();
+        return {
+          ...c,
+          videoCount: counts[normalizedUsername] || 0
+        };
+      });
     } catch (e) {
       console.error("Error calculating video counts:", e);
       return channels;

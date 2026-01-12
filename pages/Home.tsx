@@ -107,7 +107,6 @@ export const Home: React.FC = () => {
                    </div>
                    <div className="flex-1">
                      <p className="font-bold text-sm text-black">@{channel.username}</p>
-                     <p className="text-xs text-gray-500">{channel.followers} followers</p>
                    </div>
                    <button className="bg-[#fe2c55] text-white px-4 py-1.5 rounded-full text-xs font-bold">
                      View

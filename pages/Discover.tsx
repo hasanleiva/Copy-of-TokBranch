@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Search, ChevronLeft, X } from 'lucide-react';
 import { VideoService } from '../services/mockData';
@@ -90,7 +91,6 @@ export const Discover: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <p className="font-bold text-sm text-gray-900">@{channel.username}</p>
-                  <p className="text-xs text-gray-500">{channel.followers} followers</p>
                 </div>
                 <button className="bg-[#fe2c55] text-white px-5 py-1.5 rounded-md text-xs font-bold shadow-sm active:scale-95 transition-transform">
                   View

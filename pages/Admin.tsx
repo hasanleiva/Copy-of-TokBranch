@@ -4,9 +4,11 @@ import { Branch, VideoData } from '../types';
 import { VideoService } from '../services/mockData';
 import { Plus, Trash2, Video as VideoIcon, ChevronLeft, FileJson } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { useAuth } from '../services/authContext';
 
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [id, setId] = useState('');
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
@@ -46,13 +48,17 @@ export const Admin: React.FC = () => {
       return;
     }
 
+    // Determine uploaderId from current user context
+    const uploaderId = user?.email ? user.email.split('@')[0] : 'anonymous';
+
     const payload: VideoData = {
       id,
       title,
       description: desc,
       mainVideoUrl: videoUrl,
       jsonName,
-      branches: branches
+      branches: branches,
+      uploaderId: uploaderId
     }
     await VideoService.uploadVideo(payload);
     alert('Video configuration saved!');
