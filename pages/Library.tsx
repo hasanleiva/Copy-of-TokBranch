@@ -83,7 +83,7 @@ export const Library: React.FC = () => {
                    <div 
                       key={`${video.id}-${idx}`} 
                       className="relative aspect-[3/4] rounded-xl overflow-hidden cursor-pointer group shadow-sm"
-                      onClick={() => navigate(`/explore/${video.id}`)}
+                      onClick={() => navigate(`/explore/${video.id}`, { state: { skipViewCount: true } })}
                     >
                       <img 
                         src={video.thumbnailUrl} 

@@ -1,17 +1,21 @@
 
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router';
+import { useParams, useLocation } from 'react-router';
 import { FeedItem } from '../components/FeedItem';
 import { VideoService } from '../services/mockData';
 import { Loader2 } from 'lucide-react';
 
 export const Feed: React.FC = () => {
   const { startId } = useParams<{ startId?: string }>();
+  const location = useLocation();
   // Renamed state to better reflect that we are storing paths
   const [videoPaths, setVideoPaths] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   // Lifted state for mute persistence
   const [isMuted, setIsMuted] = useState(true);
+
+  // Check if we should disable view counting (e.g. when coming from library)
+  const disableViewCount = location.state?.skipViewCount === true;
 
   useEffect(() => {
     const loadFeed = async () => {
@@ -50,11 +54,11 @@ export const Feed: React.FC = () => {
     <div className="w-full h-full overflow-y-scroll snap-y snap-mandatory scroll-smooth no-scrollbar bg-black">
       {videoPaths.map((path, index) => (
         <div key={`${path}-${index}`} className="w-full h-full">
-            {/* Fix: Changed videoId prop to jsonPath as expected by FeedItem */}
             <FeedItem 
               jsonPath={path} 
               isMuted={isMuted} 
               setIsMuted={setIsMuted} 
+              disableViewCount={disableViewCount}
             />
         </div>
       ))}

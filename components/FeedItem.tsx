@@ -13,9 +13,10 @@ interface FeedItemProps {
   jsonPath: string;
   isMuted: boolean;
   setIsMuted: (val: boolean) => void;
+  disableViewCount?: boolean;
 }
 
-export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMuted }) => {
+export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMuted, disableViewCount }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [containerRef, isVisible] = useElementOnScreen({
@@ -69,10 +70,13 @@ export const FeedItem: React.FC<FeedItemProps> = ({ jsonPath, isMuted, setIsMute
   // Handle View Counting
   useEffect(() => {
     if (isVisible && !hasViewed && videoData?.id) {
-      FirestoreService.incrementView(videoData.id);
+      // Only increment view if counting is not explicitly disabled
+      if (!disableViewCount) {
+        FirestoreService.incrementView(videoData.id);
+      }
       setHasViewed(true);
     }
-  }, [isVisible, hasViewed, videoData?.id]);
+  }, [isVisible, hasViewed, videoData?.id, disableViewCount]);
 
   const handleBranchSelect = async (branch: Branch) => {
     setLoading(true);
